@@ -105,7 +105,7 @@ function swatch(color, onPick, current) {
 }
 
 /** Popover shown for a fresh selection. */
-function popForSelection(sel) {
+function popForSelection(sel, at) {
   const pop = $('#selPop');
   const { qid, root, onChange } = active;
 
@@ -140,7 +140,7 @@ function popForSelection(sel) {
       },
     }, 'Copy'),
   );
-  place(pop, sel.rect);
+  place(pop, at || sel.rect);
 }
 
 /** Popover shown when an existing highlight is clicked. */
@@ -250,6 +250,25 @@ export function attachHighlighter(root, { qid, onChange } = {}) {
     }
   };
 
+  /* Right-click is where people reach for "do something with this selection",
+     so it opens the same popover rather than the browser's menu. With nothing
+     selected, and away from a highlight, the native menu is left alone. */
+  const onContext = (ev) => {
+    const mark = ev.target.closest('mark.hl');
+    if (mark && root.contains(mark)) {
+      ev.preventDefault();
+      popForHighlight(mark);
+      return;
+    }
+    const sel = readSelection(root);
+    if (!sel) return;
+    ev.preventDefault();
+    // Anchored to the pointer, which is where a context menu is expected.
+    popForSelection(sel, {
+      left: ev.clientX, top: ev.clientY, bottom: ev.clientY, width: 0, height: 0,
+    });
+  };
+
   const onDocDown = (ev) => {
     if (ev.target.closest('.sel-pop') || ev.target.closest('mark.hl')) return;
     hidePopover();
@@ -259,12 +278,14 @@ export function attachHighlighter(root, { qid, onChange } = {}) {
 
   root.addEventListener('mouseup', onUp);
   root.addEventListener('click', onClick);
+  root.addEventListener('contextmenu', onContext);
   document.addEventListener('mousedown', onDocDown);
   root.closest('.runner__main, .view')?.addEventListener('scroll', onScroll, { passive: true });
 
   return function detach() {
     root.removeEventListener('mouseup', onUp);
     root.removeEventListener('click', onClick);
+    root.removeEventListener('contextmenu', onContext);
     document.removeEventListener('mousedown', onDocDown);
     root.closest('.runner__main, .view')?.removeEventListener('scroll', onScroll);
     hidePopover();

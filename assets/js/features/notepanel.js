@@ -26,6 +26,7 @@ let docEl = null;
 let saveTimer = null;
 let detachDrag = null;
 let writing = false;        // true while the panel is saving its own edits
+let lastBlock = null;       // the block the caret was last in, for placement
 
 const MIN_W = 300;
 const MAX_W = 760;
@@ -57,7 +58,7 @@ export function noteTitle(note) {
     const t = (el.textContent || '').trim();
     if (t) return t.length > 70 ? `${t.slice(0, 70)}…` : t;
   }
-  return 'New note';
+  return 'Untitled note';
 }
 
 /* ── open / close / size ──────────────────────────────────────────────── */
@@ -111,10 +112,24 @@ export function draw() {
     oninput: onInput,
     onkeydown: onKey,
     onclick: onDocClick,
-    onblur: rememberRange,
+    onblur: () => { rememberRange(); showCaretMark(); },
+    onfocus: hideCaretMark,
+    onmouseup: rememberRange,
+    onkeyup: rememberRange,
     onpaste: (ev) => {
       ev.preventDefault();
       document.execCommand('insertText', false, ev.clipboardData.getData('text/plain'));
+    },
+  });
+
+  const titleEl = h('input.note-title', {
+    type: 'text',
+    value: note.title || '',
+    placeholder: 'Untitled note',
+    'aria-label': 'Note title',
+    oninput: () => queue(() => ({ title: titleEl.value })),
+    onkeydown: (ev) => {
+      if (ev.key === 'Enter' || ev.key === 'ArrowDown') { ev.preventDefault(); focusEnd(); }
     },
   });
 
@@ -122,19 +137,21 @@ export function draw() {
     h('div.panel__grip', { title: 'Drag to resize', onpointerdown: startResize }),
 
     h('header.panel__head',
-      h('button.panel__book', { title: 'Switch or create a note', onclick: switchNote },
+      h('button.panel__book', { title: 'Browse notebooks and notes', onclick: browseNotes },
         h('span.dot', { style: { background: book?.color || 'var(--ink-4)' } }),
         h('span.truncate', book?.name || 'General'),
         h('span.dest__chev', '▾')),
       h('div.push.row', { style: { gap: '2px' } },
         h('button.panel__ico', { title: 'New note', 'aria-label': 'New note', onclick: newNote }, '+'),
-        h('button.panel__ico', { title: 'More', 'aria-label': 'More', onclick: moreMenu }, '···'),
+        h('button.panel__ico', { title: 'Note options', 'aria-label': 'Note options', onclick: moreMenu }, '···'),
         h('button.panel__ico', { title: 'Close  ⌘J', 'aria-label': 'Close notebook', onclick: () => setOpen(false) }, '✕'))),
 
     toolbar(),
 
     h('div.panel__body',
-      h('div.panel__inner', h('div.doc-wrap', docEl))),
+      h('div.panel__inner',
+        titleEl,
+        h('div.doc-wrap', docEl))),
 
     h('footer.panel__foot',
       h('span.truncate', `Edited ${ago(note.updated)}`),
@@ -176,9 +193,19 @@ function persist(patch) {
   writing = false;
 }
 
+let pending = {};
+
+/* The title and the document share one debounce. Replacing the callback would
+   let whichever field changed last discard the other's edit, so the patches
+   are merged instead. */
 function queue(getPatch) {
+  Object.assign(pending, getPatch());
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => persist(getPatch()), 400);
+  saveTimer = setTimeout(() => {
+    const patch = pending;
+    pending = {};
+    persist(patch);
+  }, 400);
 }
 
 function serialise() {
@@ -284,9 +311,12 @@ let savedRange = null;
 
 function rememberRange() {
   const sel = getSelection();
-  if (sel && sel.rangeCount && docEl?.contains(sel.anchorNode)) {
-    savedRange = sel.getRangeAt(0).cloneRange();
-  }
+  if (!sel || !sel.rangeCount || !docEl?.contains(sel.anchorNode)) return;
+  savedRange = sel.getRangeAt(0).cloneRange();
+  // A Range goes stale the moment the document is rebuilt; the block it sat in
+  // is a far more durable answer to "where was I".
+  const blk = blockOf(sel.anchorNode);
+  if (blk && blk.parentElement === docEl) lastBlock = blk;
 }
 
 function restoreRange() {
@@ -421,6 +451,84 @@ function syncToolbar() {
   styleSelect.value = BLOCKS.some(([t]) => t === tag) ? tag : 'p';
 }
 
+/* ── placing a clipping ───────────────────────────────────────────────── */
+
+/**
+ * Put a block where the reader last had the caret. Returns false when the
+ * panel cannot place it — the caller then falls back to the end of the note.
+ */
+export function insertAtCaret(noteId, html) {
+  if (!isOpen() || !docEl || activeNote()?.id !== noteId) return false;
+
+  const frag = document.createRange().createContextualFragment(html);
+  const blocks = [...frag.children];
+  if (!blocks.length) return false;
+
+  const at = lastBlock && lastBlock.parentElement === docEl ? lastBlock : null;
+
+  if (at) {
+    // After the paragraph the caret was in, so the reader's place is kept.
+    at.after(frag);
+  } else {
+    docEl.appendChild(frag);
+  }
+
+  hydrate(activeNote());
+  markEmpty();
+
+  // Leave the caret after what was just placed, ready to keep writing.
+  const last = blocks[blocks.length - 1];
+  const r = document.createRange();
+  r.selectNodeContents(last);
+  r.collapse(false);
+  savedRange = r;
+  lastBlock = last.parentElement === docEl ? last : lastBlock;
+
+  clearTimeout(saveTimer);
+  persist({ html: serialise() });
+  showCaretMark();
+  last.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  return true;
+}
+
+/* ── where the caret was ──────────────────────────────────────────────── */
+
+let caretMark = null;
+let watcher = null;
+
+/* Once the note loses focus the caret vanishes, and with it any sense of where
+   the next saved passage will go. A quiet bar marks the block it was in —
+   which is exactly the precision the insertion uses. */
+function showCaretMark() {
+  const wrap = root?.querySelector('.doc-wrap');
+  if (!wrap || !docEl) return;
+  if (!lastBlock || lastBlock.parentElement !== docEl) { hideCaretMark(); return; }
+
+  // Redrawing the note builds a fresh wrap, orphaning the old bar.
+  if (caretMark?.parentElement !== wrap) {
+    watcher?.disconnect();
+    caretMark = h('span.doc-caret', { title: 'Anything you save from a question goes here' });
+    wrap.appendChild(caretMark);
+    // A saved passage lands and reflows the note under the bar. Re-measuring on
+    // every reflow keeps it on the block it names instead of a stale rectangle.
+    watcher = new ResizeObserver(() => { if (caretMark?.classList.contains('on')) place(); });
+    watcher.observe(docEl);
+  }
+  caretMark.classList.add('on');
+  // Measured next frame: a block placed this tick has not been laid out yet.
+  requestAnimationFrame(place);
+
+  function place() {
+    if (!lastBlock?.isConnected || lastBlock.parentElement !== docEl) return;
+    const r = lastBlock.getBoundingClientRect();
+    const wr = wrap.getBoundingClientRect();
+    caretMark.style.top = `${r.top - wr.top}px`;
+    caretMark.style.height = `${Math.max(18, r.height)}px`;
+  }
+}
+
+function hideCaretMark() { caretMark?.classList.remove('on'); }
+
 /* ── source marks ─────────────────────────────────────────────────────── */
 
 /* The mark lives in the paragraph's right-hand gutter. Only a plain click
@@ -503,26 +611,68 @@ function newNote() {
   });
 }
 
-function switchNote() {
-  const activeId = activeNote().id;
-  const body = h('div.stack-16',
-    store.state.notebooks.map((book) => {
-      const notes = store.state.notes.filter((n) => n.book === book.id);
-      return h('div.stack-6',
-        h('div.row', { style: { gap: '8px' } },
-          h('span.dot', { style: { background: book.color } }),
-          h('span.label.grow', book.name)),
-        notes.length
-          ? h('div.stack-4', notes.slice(0, 40).map((n) => h('button.pick-row', {
-            'aria-pressed': String(n.id === activeId),
-            onclick: () => { store.setCaptureTarget(n.id); close(); draw(); },
-          }, h('span.truncate.grow', noteTitle(n)))))
-          : h('p.xs.muted', { style: { paddingLeft: '16px' } }, 'Empty'));
-    }));
+/* ── browsing notebooks and notes ─────────────────────────────────────── */
 
-  const close = modal({
-    title: 'Notes',
-    desc: 'What is open here is also where clippings land.',
+const collapsed = () => new Set(store.prefs().collapsedBooks || []);
+function toggleBook(id) {
+  const set = collapsed();
+  if (set.has(id)) set.delete(id); else set.add(id);
+  store.setPref('collapsedBooks', [...set]);
+}
+
+/**
+ * The notebook shelf: notebooks, each opening to reveal its notes. Built here
+ * and on the Notes page from the same idea, so the structure reads the same
+ * way in both places.
+ */
+function browseNotes() {
+  let close;
+
+  const body = h('div.shelf');
+
+  const render = () => {
+    const openId = activeNote()?.id;
+    const shut = collapsed();
+
+    fill(body, store.state.notebooks.map((book) => {
+      const notes = store.state.notes.filter((n) => n.book === book.id);
+      const isShut = shut.has(book.id);
+
+      return h('section.shelf__book',
+        h('div.shelf__head',
+          h('button.shelf__toggle', {
+            'aria-expanded': String(!isShut),
+            title: isShut ? `Show ${book.name}` : `Hide ${book.name}`,
+            onclick: () => { toggleBook(book.id); render(); },
+          },
+            h('span.shelf__chev'),
+            h('span.dot', { style: { background: book.color } }),
+            h('span.shelf__name.truncate', book.name),
+            h('span.shelf__count', notes.length)),
+          h('button.shelf__more', {
+            title: `${book.name} settings`, 'aria-label': `${book.name} settings`,
+            onclick: () => { close(); notebookSettings(book, () => browseNotes()); },
+          }, '···')),
+
+        isShut ? null : h('div.shelf__notes',
+          notes.length
+            ? notes.map((n) => h('button.shelf__note', {
+              'aria-current': String(n.id === openId),
+              onclick: () => { store.setCaptureTarget(n.id); close(); draw(); },
+            },
+              h('span.shelf__dot'),
+              h('span.truncate.grow', noteTitle(n)),
+              n.id === openId ? h('span.shelf__open', 'open') : null))
+            : h('button.shelf__empty', {
+              onclick: () => { const n = store.createNote({ book: book.id, title: '' }); close(); openNote(n.id); },
+            }, 'Add the first note')));
+    }));
+  };
+  render();
+
+  close = modal({
+    title: 'Notebooks',
+    desc: 'Anything you save from a question goes into the note that is open.',
     body,
     actions: (dismiss) => [
       h('button.btn', {
@@ -533,12 +683,72 @@ function switchNote() {
           });
           if (!name) return;
           const book = store.createNotebook(name);
-          store.setCaptureTarget(store.createNote({ book: book.id, title: '' }).id);
-          dismiss(); draw();
+          dismiss();
+          openNote(store.createNote({ book: book.id, title: '' }).id);
         },
       }, 'New notebook'),
       h('button.btn.btn--primary', { onclick: () => { dismiss(); newNote(); } }, 'New note'),
     ],
+  });
+}
+
+/** Rename a notebook, recolour it, or remove it. */
+export function notebookSettings(book, after) {
+  const name = h('input.input', { type: 'text', value: book.name });
+  let colour = book.color;
+  const count = store.state.notes.filter((x) => x.book === book.id).length;
+
+  const swatches = h('div.row.row--wrap', { style: { gap: '6px' } },
+    store.BOOK_COLORS.map((c) => h('button.sw', {
+      'aria-pressed': String(colour === c),
+      style: { background: c },
+      'aria-label': 'Set colour',
+      onclick: (ev) => {
+        colour = c;
+        ev.currentTarget.parentElement.querySelectorAll('.sw')
+          .forEach((x) => x.setAttribute('aria-pressed', 'false'));
+        ev.currentTarget.setAttribute('aria-pressed', 'true');
+      },
+    })));
+
+  modal({
+    title: 'Notebook',
+    desc: `${count} note${count === 1 ? '' : 's'}`,
+    body: h('div.stack-16',
+      h('label.field', h('span.label', 'Name'), name),
+      h('div.field', h('span.label', 'Colour'), swatches)),
+    actions: (close) => [
+      store.state.notebooks.length > 1
+        ? h('button.btn.btn--danger', {
+          onclick: async () => {
+            close();
+            const ok = await confirm({
+              title: `Delete “${book.name}”?`,
+              desc: count
+                ? `Its ${count} note${count === 1 ? '' : 's'} move to ${store.state.notebooks.find((x) => x.id !== book.id).name}.`
+                : 'This notebook is empty.',
+              ok: 'Delete notebook', danger: true,
+            });
+            if (!ok) { after?.(); return; }
+            store.deleteNotebook(book.id);
+            draw();
+            after?.();
+            toast('Notebook deleted');
+          },
+        }, 'Delete')
+        : null,
+      h('button.btn.btn--primary', {
+        onclick: () => {
+          store.updateNotebook(book.id, {
+            name: name.value.trim() || book.name,
+            color: colour,
+          });
+          close();
+          draw();
+          after?.();
+        },
+      }, 'Done'),
+    ].filter(Boolean),
   });
 }
 
@@ -554,6 +764,9 @@ function moreMenu() {
         }, store.state.notebooks.map((b) => h('option', {
           value: b.id, selected: b.id === note.book,
         }, b.name)))),
+      h('button.btn.btn--block', {
+        onclick: () => { close(); notebookSettings(store.notebookById(note.book)); },
+      }, 'Notebook settings'),
       h('button.btn.btn--block', { onclick: () => { close(); go('/notebook'); } }, 'All notes'),
       h('button.btn.btn--block', { onclick: () => { close(); exportNote(note); } }, 'Export as Word (.docx)')),
     actions: (dismiss) => [

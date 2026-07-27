@@ -7,7 +7,7 @@
 import * as store from '../core/store.js';
 import { meta, cat } from '../core/bank.js';
 import { toast } from './overlay.js';
-import { activeNote, setOpen, draw, isOpen } from './notepanel.js';
+import { activeNote, setOpen, draw, isOpen, insertAtCaret, noteTitle } from './notepanel.js';
 
 /** Where the passage came from, in a form short enough for a margin. */
 function sourceOf(qid, label) {
@@ -16,40 +16,45 @@ function sourceOf(qid, label) {
   return [label, m.topic, qid].filter(Boolean).join(' · ');
 }
 
-function landed(what) {
-  const note = activeNote();
-  if (!isOpen()) setOpen(true); else draw();
-  toast(`${what} → ${note.title || 'Untitled note'}`);
+/** Place the block where the reader was writing, or at the end if elsewhere. */
+function place(note, clip, what) {
+  const built = store.buildClip(note.id, clip);
+  if (!built) return null;
+
+  const wasOpen = isOpen();
+  if (!wasOpen) setOpen(true);          // opening draws the note
+
+  if (!insertAtCaret(note.id, built.html)) {
+    store.appendHtml(note.id, built.html);
+    if (wasOpen) draw();
+  }
+  toast(`${what} → ${noteTitle(note)}`);
   return note;
 }
 
 export function clipText({ qid, text, source }) {
   const note = activeNote();
-  store.addClip(note.id, { kind: 'text', qid, text, source: sourceOf(qid, source) });
-  return landed('Passage');
+  return place(note, { kind: 'text', qid, text, source: sourceOf(qid, source) }, 'Passage');
 }
 
 export function clipQuestion({ qid }) {
   const note = activeNote();
   const m = meta(qid);
-  store.addClip(note.id, {
+  return place(note, {
     kind: 'text', qid,
     text: m ? `${m.topic} — ${m.ask}` : qid,
     source: sourceOf(qid, m?.archetypeLabel),
-  });
-  return landed('Question');
+  }, 'Question');
 }
 
 export function clipFigure({ qid, spec }) {
   const note = activeNote();
-  store.addClip(note.id, { kind: 'figure', qid, spec, source: sourceOf(qid, 'Figure') });
-  return landed('Figure');
+  return place(note, { kind: 'figure', qid, spec, source: sourceOf(qid, 'Figure') }, 'Figure');
 }
 
 export function clipTable({ qid, spec }) {
   const note = activeNote();
-  store.addClip(note.id, { kind: 'table', qid, spec, source: sourceOf(qid, 'Table') });
-  return landed('Table');
+  return place(note, { kind: 'table', qid, spec, source: sourceOf(qid, 'Table') }, 'Table');
 }
 
 export { activeNote, cat };

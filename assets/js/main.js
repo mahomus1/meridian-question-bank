@@ -7,6 +7,7 @@ import { route, start, go, render as rerender, here } from './core/router.js';
 import { toast } from './features/overlay.js';
 import * as panel from './features/notepanel.js';
 import { n as num } from './core/fmt.js';
+import { htmlToText } from './render/prose.js';
 
 /* ── theme ────────────────────────────────────────────────────────────── */
 
@@ -183,8 +184,9 @@ function openPalette() {
 
     for (const note of store.state.notes) {
       if (out.length > 22) break;
-      if (`${note.title} ${note.body}`.toLowerCase().includes(query)) {
-        out.push({ label: note.title || 'Untitled note', hint: 'Note', go: `/notebook/${note.id}` });
+      const text = `${note.title} ${htmlToText(note.html) || note.body}`;
+      if (text.toLowerCase().includes(query)) {
+        out.push({ label: panel.noteTitle(note), hint: 'Note', go: `/notebook/${note.id}` });
       }
     }
     const items = filterItems({ query }).slice(0, 22 - out.length);

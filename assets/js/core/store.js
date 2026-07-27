@@ -43,6 +43,11 @@ function load() {
     if (!raw) return BLANK();
     const data = JSON.parse(raw);
     const base = BLANK();
+    // Notes once stored the placeholder as a real title, which left the field
+    // showing grey-looking text you had to delete before typing a name.
+    for (const note of data.notes || []) {
+      if ((note.title || '').trim() === 'Untitled note') note.title = '';
+    }
     return {
       ...base, ...data,
       profile: { ...base.profile, ...data.profile, prefs: { ...base.profile.prefs, ...(data.profile?.prefs) } },
@@ -314,35 +319,38 @@ const escText = (s) => String(s || '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 /**
- * Add a clipping to a note.
- *
- * Prose arrives as an ordinary paragraph — same font, no frame, nothing to
- * distinguish it from what the reader typed except the source it carries as an
- * attribute. Figures and tables cannot be text, so they stay as placed objects
- * backed by their spec.
+ * Prepare a clipping: register any spec it needs and return the block of
+ * markup that represents it. Placing that block is the caller's business, so
+ * a clipping can land at the caret rather than always at the end.
  */
-export function addClip(noteId, clip) {
+export function buildClip(noteId, clip) {
   const n = noteById(noteId);
   if (!n) return null;
 
   if (clip.kind === 'text' || clip.kind === 'question') {
-    n.html = `${n.html || ''}<p data-src="${attr(clip.source || '')}"`
+    const html = `<p data-src="${attr(clip.source || '')}"`
       + (clip.qid ? ` data-qid="${attr(clip.qid)}"` : '')
-      + `>${escText(clip.text)}</p><p><br></p>`;
-    n.updated = Date.now();
-    changed('notes', noteId);
-    return null;
+      + `>${escText(clip.text)}</p>`;
+    return { rec: null, html };
   }
 
   const rec = { id: uid('c'), at: Date.now(), ...clip };
   n.clips.push(rec);
-  n.html = `${n.html || ''}<div class="doc-obj" contenteditable="false"`
+  const html = `<div class="doc-obj" contenteditable="false"`
     + ` data-clip="${rec.id}" data-kind="${attr(rec.kind)}"`
     + (clip.qid ? ` data-qid="${attr(clip.qid)}"` : '')
     + ` data-src="${attr(clip.source || '')}"></div><p><br></p>`;
+  return { rec, html };
+}
+
+/** Fallback placement: put the block at the end of the note. */
+export function appendHtml(noteId, html) {
+  const n = noteById(noteId);
+  if (!n) return null;
+  n.html = `${n.html || ''}${html}`;
   n.updated = Date.now();
   changed('notes', noteId);
-  return rec;
+  return n;
 }
 
 export function removeClip(noteId, clipId) {

@@ -410,10 +410,13 @@
 .why__t { font-family: var(--prose); font-size: 14.5px; line-height: 1.55; }
 .why__t b { font-weight: 650; }
 
+/* Not a flex container: highlighting splits the block into text nodes and
+   <mark> elements, and flex would make each one its own item — breaking the
+   sentence apart mid-word wherever a highlight starts or ends. */
 .objective {
-  display: flex; gap: 10px; padding: 13px 15px; margin-top: 20px;
+  display: block; padding: 13px 15px; margin-top: 20px;
   border: 1px dashed var(--rule-2); border-radius: var(--r);
-  font-size: 13.5px; color: var(--ink-2);
+  font-size: 13.5px; color: var(--ink-2); line-height: 1.55;
 }
 .objective b { font-weight: 640; color: var(--ink); }
 
@@ -544,7 +547,9 @@
 
 .panel {
   grid-column: 3; grid-row: 1;
-  display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
+  /* header, toolbar, document, footer — the document takes what is left.
+     One row short and the toolbar would take the flexible row and collapse. */
+  display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto;
   min-height: 0; position: relative;
   background: var(--surface);
   border-left: 1px solid var(--rule);
@@ -676,7 +681,8 @@ body.resizing-panel { cursor: col-resize; user-select: none; }
 .doc-wrap { position: relative; padding-left: 20px; margin-left: -20px; }
 
 .doc-handle {
-  position: absolute; left: 0; width: 18px; height: 20px;
+  /* Clear of the caret bar, which claims the first few pixels of the gutter. */
+  position: absolute; left: 5px; width: 15px; height: 20px;
   border-radius: var(--r-sm); cursor: grab;
   opacity: 0; pointer-events: none;
   transition: opacity var(--t), background var(--t);
@@ -702,46 +708,131 @@ body.resizing-panel { cursor: col-resize; user-select: none; }
 .doc > .is-dragging { opacity: .38; }
 body.dragging-block { cursor: grabbing; user-select: none; }
 
-/* ── notes page ─────────────────────────────────────────────────────── */
+/* ── the shelf: notebooks, and the notes inside them ────────────────── */
 
-.notes { display: grid; gap: 18px; }
-.notes__bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.shelf { display: grid; gap: 10px; }
+.shelf--page { gap: 12px; }
+.shelf__bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
 
-.chip--add { border-style: dashed; color: var(--ink-3); }
-.chip--add:hover { color: var(--blue); border-color: var(--blue-2); }
-.chip__gear {
-  margin-left: 2px; padding: 0 2px; color: var(--ink-4);
-  letter-spacing: .5px; opacity: 0; transition: opacity var(--t);
-}
-.chip:hover .chip__gear { opacity: 1; }
-.chip__gear:hover { color: var(--ink); }
-
-.notes__list {
+.shelf__book {
   border: 1px solid var(--rule); border-radius: var(--r-lg);
   background: var(--surface); overflow: hidden;
 }
-.note-row {
-  display: flex; align-items: center; gap: 11px; width: 100%;
-  padding: 11px 15px; text-align: left;
-  border-bottom: 1px solid var(--rule);
+
+.shelf__head {
+  display: flex; align-items: center; gap: 4px;
+  padding: 2px 8px 2px 4px;
+  background: var(--surface-2); border-bottom: 1px solid transparent;
+  transition: border-color var(--t);
+}
+.shelf__book:has(.shelf__notes) .shelf__head { border-bottom-color: var(--rule); }
+
+.shelf__toggle {
+  display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0;
+  padding: 9px 6px; border-radius: var(--r); text-align: left;
+  color: var(--ink);
+}
+.shelf__toggle:hover .shelf__name { color: var(--blue); }
+.shelf__chev {
+  width: 14px; height: 14px; flex: none;
+  font-size: 0;                       /* the glyph is drawn, not typed */
+  background: var(--ink-3);
+  -webkit-mask: var(--chev) center / 10px no-repeat;
+  mask: var(--chev) center / 10px no-repeat;
+  --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 2.5 4 3.5-4 3.5'/%3E%3C/svg%3E");
+  transition: transform .18s var(--ease), background var(--t);
+}
+.shelf__toggle[aria-expanded="true"] .shelf__chev { transform: rotate(90deg); }
+.shelf__toggle:hover .shelf__chev { background: var(--ink); }
+.shelf__name { font-size: 13px; font-weight: 640; letter-spacing: -.008em; }
+.shelf__count {
+  flex: none; min-width: 20px; padding: 0 6px; height: 17px;
+  display: grid; place-content: center; border-radius: 99px;
+  background: var(--surface-3); color: var(--ink-3);
+  font-size: 10.5px; font-weight: 620; font-variant-numeric: tabular-nums;
+}
+/* notebook colour swatches */
+.sw {
+  width: 26px; height: 26px; flex: none; border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, .12);
+  box-shadow: inset 0 0 0 2px var(--surface);
+  cursor: pointer;
+  transition: transform var(--t), box-shadow var(--t);
+}
+.sw:hover { transform: scale(1.08); }
+/* The ring reads as selection without tinting the colour being chosen. */
+.sw[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 2px var(--surface), 0 0 0 2px var(--ink-2);
+}
+.sw:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+.shelf__more {
+  flex: none; width: 24px; height: 24px; border-radius: var(--r-sm);
+  display: grid; place-content: center;
+  color: var(--ink-4); font-size: 12px; letter-spacing: .5px;
+  opacity: 0; transition: opacity var(--t), background var(--t), color var(--t);
+}
+.shelf__head:hover .shelf__more, .shelf__more:focus-visible { opacity: 1; }
+.shelf__more:hover { background: var(--surface-3); color: var(--ink); }
+@media (hover: none) { .shelf__more { opacity: 1; } }
+
+.shelf__notes { display: grid; }
+
+/* a note inside a notebook */
+.shelf__row {
+  display: grid; align-items: baseline; gap: 12px; width: 100%;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.6fr) auto;
+  padding: 9px 14px 9px 26px; text-align: left;
+  border-top: 1px solid var(--rule);
   transition: background var(--t);
 }
-.note-row:last-child { border-bottom: 0; }
-.note-row:hover { background: var(--surface-2); }
-.note-row[aria-current="true"] {
-  background: var(--blue-tint); box-shadow: inset 2px 0 0 var(--blue);
+.shelf__row:first-child { border-top: 0; }
+.shelf__row:hover { background: var(--surface-2); }
+.shelf__row[aria-current="true"] {
+  background: var(--blue-tint);
+  box-shadow: inset 3px 0 0 var(--blue);
 }
-.note-row__dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
-.note-row__t { font-size: 13.5px; font-weight: 600; flex: 0 1 auto; max-width: 42%; }
-.note-row__p {
-  font-family: var(--prose); font-size: 13.5px; color: var(--ink-3); flex: 1 1 auto; min-width: 0;
+.shelf__row-t { font-size: 13.5px; font-weight: 600; min-width: 0; }
+.shelf__row-p { font-family: var(--prose); font-size: 13.5px; color: var(--ink-3); min-width: 0; }
+.shelf__row-d {
+  font-size: 11.5px; color: var(--ink-4); white-space: nowrap;
+  justify-self: end; font-variant-numeric: tabular-nums;
 }
-.note-row__d { font-size: 11.5px; color: var(--ink-4); flex: none; }
+
+.shelf__empty {
+  width: 100%; padding: 12px 26px; text-align: left;
+  font-size: 12.5px; color: var(--ink-4);
+  transition: color var(--t), background var(--t);
+}
+.shelf__empty:hover { color: var(--blue); background: var(--surface-2); }
+
+/* the compact shelf inside the panel's dialog */
+.shelf .shelf__note {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 7px 14px 7px 24px; text-align: left;
+  font-size: 13px; color: var(--ink-2);
+  border-top: 1px solid var(--rule);
+  transition: background var(--t), color var(--t);
+}
+.shelf__note:first-child { border-top: 0; }
+.shelf__note:hover { background: var(--surface-2); color: var(--ink); }
+.shelf__note[aria-current="true"] {
+  background: var(--blue-tint); color: var(--blue); font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--blue);
+}
+.shelf__dot {
+  width: 4px; height: 4px; border-radius: 50%; flex: none;
+  background: var(--rule-2);
+}
+.shelf__note[aria-current="true"] .shelf__dot { background: var(--blue); }
+.shelf__open {
+  flex: none; font-size: 10px; font-weight: 700; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--blue); opacity: .75;
+}
 
 @media (max-width: 720px) {
-  .note-row { flex-wrap: wrap; }
-  .note-row__t { max-width: none; flex: 1 1 auto; }
-  .note-row__p { flex: 1 1 100%; }
+  .shelf__row { grid-template-columns: minmax(0, 1fr) auto; padding-left: 20px; }
+  .shelf__row-p { grid-column: 1 / -1; }
 }
 
 /* ── performance ────────────────────────────────────────────────────── */
@@ -808,10 +899,15 @@ body.dragging-block { cursor: grabbing; user-select: none; }
 /* ── notebook toolbar ───────────────────────────────────────────────── */
 
 .tb {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 1px;
-  padding: 5px 8px; border-bottom: 1px solid var(--rule);
+  display: flex; align-items: center; flex-wrap: nowrap; gap: 2px;
+  padding: 6px 8px; border-bottom: 1px solid var(--rule);
   background: var(--surface-2);
+  position: relative; z-index: 2;
+  overflow-x: auto; overscroll-behavior-x: contain;
+  scrollbar-width: none;
 }
+.tb::-webkit-scrollbar { display: none; }
+.tb__b, .tb__sel, .tb__sep { flex: none; }
 .tb__b {
   min-width: 25px; height: 25px; padding: 0 5px; border-radius: var(--r-sm);
   display: inline-flex; align-items: center; justify-content: center;
@@ -879,3 +975,26 @@ body.dragging-block { cursor: grabbing; user-select: none; }
 }
 .pick-card b { font-size: 13.5px; font-weight: 620; }
 .pick-card span { font-size: 12px; color: var(--ink-3); line-height: 1.45; }
+
+/* where the caret was, once the note loses focus */
+.doc-caret {
+  position: absolute; left: 0; width: 2px; border-radius: 1px;
+  background: var(--blue); opacity: 0; pointer-events: none;
+  transition: opacity var(--t), top .18s var(--ease), height .18s var(--ease);
+}
+.doc-caret.on { opacity: .5; pointer-events: auto; }
+
+/* the note's own title, above the document */
+.note-title {
+  width: 100%; border: 0; background: none; padding: 0 0 4px;
+  font-family: var(--ui); font-size: 22px; font-weight: 650;
+  letter-spacing: -.02em; color: var(--ink);
+}
+.note-title:focus { outline: none; }
+.note-title::placeholder { color: var(--ink-4); font-weight: 600; }
+
+/* With a title of its own, the first line is just a line. */
+.doc > *:first-child {
+  font-family: var(--prose); font-size: 16px; font-weight: 400;
+  letter-spacing: 0; line-height: 1.66; margin-bottom: 12px;
+}
