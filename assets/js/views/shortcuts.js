@@ -11,6 +11,7 @@ const GROUPS = [
       [[mod, 'K'], 'Search questions, notes, and pages'],
       [['/'], 'Search'],
       [['?'], 'This list'],
+      [[mod, 'J'], 'Open or close the notebook'],
     ],
   },
   {
@@ -23,7 +24,6 @@ const GROUPS = [
       [['M'], 'Mark this item for review'],
       [['H'], 'Highlight the selected passage'],
       [['L'], 'Open reference intervals'],
-      [[mod, '\\'], 'Show or hide the side panel'],
       [['\u2325', 'click'], 'Rule a choice out (or right-click it, or use the \u2298)'],
     ],
   },
@@ -35,6 +35,7 @@ const GROUPS = [
   },
   {
     name: 'In the notebook', keys: [
+      [[mod, 'J'], 'Open or close the panel'],
       [[mod, 'B'], 'Bold'],
       [[mod, 'I'], 'Italic'],
     ],

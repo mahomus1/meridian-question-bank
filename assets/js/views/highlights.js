@@ -10,7 +10,7 @@ import { meta, cat, getQuestion, loadCategory } from '../core/bank.js';
 import { go } from '../core/router.js';
 import { n } from '../core/fmt.js';
 import { COLORS } from '../features/highlight.js';
-import { clipText, targetLabel, chooseTarget } from '../features/capture.js';
+import { clipText } from '../features/capture.js';
 import { toast, confirm } from '../features/overlay.js';
 import { catTag, empty } from './parts.js';
 
@@ -66,7 +66,6 @@ export default async function highlights() {
       .filter((g) => g.items.length && (!catFilter || g.m.cat === catFilter));
 
     const total = shown.reduce((s, g) => s + g.items.length, 0);
-    const dest = targetLabel(shown[0]?.qid);
 
     fill(host,
       h('div.row.row--wrap', { style: { gap: '8px', marginBottom: '16px' } },
@@ -91,11 +90,7 @@ export default async function highlights() {
             value: slug, selected: catFilter === slug,
           }, cat(slug)?.name || slug))),
         h('div.push.row', { style: { gap: '8px' } },
-          h('span.xs.muted', `${n(total)} of ${n(groups.reduce((s, g) => s + g.items.length, 0))}`),
-          h('button.btn.btn--sm', {
-            onclick: () => chooseTarget({ onPick: () => draw() }),
-            title: 'Change where passages are saved',
-          }, `Saving to: ${dest.title}`))),
+          h('span.xs.muted', `${n(total)} of ${n(groups.reduce((s, g) => s + g.items.length, 0))}`),)),
 
       shown.length
         ? h('div.stack-12', shown.map((g) => h('div.panel',
@@ -111,11 +106,7 @@ export default async function highlights() {
               h('p.hl-row__t.grow', text),
               h('div.hl-row__act',
                 h('button.btn.btn--sm', {
-                  onclick: () => {
-                    const note = clipText({ qid: g.qid, text, source: 'Highlight', color: hl.c });
-                    if (note) store.updateHighlight(g.qid, hl.id, { note: note.id });
-                    draw();
-                  },
+                  onclick: () => { clipText({ qid: g.qid, text, source: 'Highlight' }); draw(); },
                 }, 'To notebook'),
                 h('button.btn.btn--sm.btn--ghost', {
                   title: 'Remove this highlight',

@@ -192,6 +192,7 @@ h1, h2, h3, h4 { font-weight: 600; line-height: 1.25; }
   /* An implicit auto row would size to content and push the shell past the
      viewport, letting the document itself scroll. Pin it instead. */
   grid-template-rows: minmax(0, 1fr);
+  transition: grid-template-columns .22s var(--ease);
   height: 100vh; height: 100dvh;
   overflow: hidden;
 }
@@ -219,6 +220,26 @@ h1, h2, h3, h4 { font-weight: 600; line-height: 1.25; }
 .view:focus { outline: none; }
 /* Views that manage their own internal scrolling (runner, notebook, reader). */
 .view--fixed { overflow: hidden; }
+
+.app--panel { grid-template-columns: var(--rail-w) minmax(0, 1fr) var(--panel-w, 380px); }
+
+/* Too narrow to give the panel a column of its own: slide it over the page
+   instead of squeezing the question into nothing. */
+@media (max-width: 1040px) {
+  .app--panel { grid-template-columns: var(--rail-w) minmax(0, 1fr); }
+  .app--panel .panel {
+    position: fixed; inset: 0 0 0 auto; z-index: 40;
+    width: min(var(--panel-w, 380px), 92vw);
+    box-shadow: var(--shadow-3);
+    animation: panel-in .22s var(--ease);
+  }
+  .app--panel .panel__grip { display: none; }
+}
+@keyframes panel-in { from { transform: translateX(14px); opacity: .6 } }
+
+@media (max-width: 1000px) {
+  .app--panel .panel { top: 0; }
+}
 
 .wrap { max-width: 1180px; padding: 26px 32px 72px; margin: 0 auto; }
 .wrap--wide { max-width: 1440px; }

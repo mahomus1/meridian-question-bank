@@ -10,7 +10,8 @@ import { h, fill, $ } from '../core/dom.js';
 import * as store from '../core/store.js';
 import { paint } from '../render/prose.js';
 import { toast } from './overlay.js';
-import { clipText, targetNote } from './capture.js';
+import { clipText } from './capture.js';
+import { activeNote } from './notepanel.js';
 import { go } from '../core/router.js';
 
 export const COLORS = [
@@ -168,16 +169,11 @@ function popForHighlight(markEl) {
       : h('button.sel-pop__btn', {
         type: 'button',
         onclick: () => {
-          const note = targetNote(qid);
-          store.addClip(note.id, {
-            kind: 'text', qid, text: markEl.textContent,
-            source: sourceLabel(blockId, active.root), color: hl.c,
-          });
-          store.updateHighlight(qid, id, { note: note.id });
+          clipText({ qid, text: markEl.textContent, source: sourceLabel(blockId, active.root) });
+          store.updateHighlight(qid, id, { note: activeNote().id });
           repaintBlock(blockId);
           hidePopover();
           onChange?.();
-          toast(`Passage saved to “${note.title}”`, { action: 'Open', onAction: () => go(`/notebook/${note.id}`) });
         },
       }, 'Save to notebook'),
     h('button.sel-pop__btn', {

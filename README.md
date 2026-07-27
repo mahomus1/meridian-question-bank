@@ -42,29 +42,27 @@ figure keeps its spec — so it redraws with the theme rather than pasting a sta
 image. The **Highlights** page collects every passage you have marked across the
 bank, filterable by colour and category, each one a click from its item.
 
-**A notebook you organise.** Notebooks are folders you create, name, colour, and
-delete; notes live in one notebook and carry any number of tags.
+**The notebook sits beside the page.** One editor panel opens on any view —
+mid-question, browsing the bank, anywhere — so a thought goes down without
+leaving what you are reading. It is resizable, and on narrow screens it slides
+over the page rather than squeezing it. `⌘J` opens and closes it.
 
-**A note is one document.** Not a text box with a pile of attachments below it —
-a single page you type into, where clippings land in the flow of your writing.
-There is no edit/preview mode: formatting appears as you apply it. A clipped
-passage arrives as **ordinary editable prose** you can trim, rephrase, split, or
-fold into your own sentence, keeping its source on a quiet line beneath that
-survives the rewriting. Figures and tables, which cannot be edited as words,
-sit inline as objects you can place and remove. Every block — heading, list,
-quotation, figure, table — has a drag handle in the left margin, so anything can
-be moved anywhere in the page. Export writes the whole document back out as
-Markdown.
+**What is open is where things land.** There is no destination to configure:
+whatever note the panel is showing is where a clipped passage, figure, or table
+goes. Switching notes switches the destination, and you can always see which one
+it is.
 
-**One visible destination.** Clippings go to the note you have pinned, shown at
-all times in the item panel as *Saving to → …*. Click it to switch note, switch
-notebook, create either, or fall back to a note per question. Nothing is ever
-filed somewhere you did not choose.
+**Clippings are just text.** A passage sent from a question becomes an ordinary
+paragraph — same face, no frame, no background, nothing marking it as an
+attachment. Its origin lives on the paragraph as an attribute, shown only as a
+small dot in the margin that opens the source question when clicked, and that
+can be switched off entirely. Figures and tables cannot be prose, so they sit
+plainly inline without a frame. Every block has a drag handle, so anything can
+be moved anywhere.
 
-**Write without leaving the item.** The item panel holds a composer, so a
-thought during a question goes straight into the destination note — with the
-topic and item id appended as provenance — without navigating away and losing
-your place. ⌘↵ saves.
+**Notebooks and notes.** Notebooks are folders you create, name, colour, and
+delete. The Notes page is a plain list for finding something again; the writing
+happens in the panel. Export a note or the whole notebook as Markdown.
 
 **Know where you stand.** Accuracy over time, by category, and by difficulty,
 each with the peer average marked for comparison, plus coverage of the bank.
@@ -113,7 +111,7 @@ app only depends on the shape of the emitted JSON.
 | `M` | Mark for review |
 | `H` | Highlight the selection |
 | `L` | Reference intervals |
-| `⌘\` | Show or hide the side panel |
+| `⌘J` | Open or close the notebook |
 | `⌥`-click | Rule a choice out (or right-click it, or use the ⊘) |
 | `⌘↵` | Save the note you are writing in the item panel |
 

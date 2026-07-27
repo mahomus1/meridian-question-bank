@@ -17,6 +17,9 @@ const BLANK = () => ({
       showRail: true,
       confirmSubmit: false,
       fontScale: 1,
+      panelOpen: false,
+      panelWidth: 380,
+      showSources: true,
     },
   },
   answers: {},     // qid -> { c, ok, ms, at, test }
@@ -302,24 +305,21 @@ const escText = (s) => String(s || '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 /**
- * Add a clipping to a note's document.
+ * Add a clipping to a note.
  *
- * Prose arrives as ordinary editable text — a quotation the reader can trim,
- * rephrase, split, or fold into their own sentence — carrying its source as an
- * attribute so the attribution survives editing without being editable itself.
- * Only figures and tables, which cannot be edited as words, stay as placed
- * objects backed by a stored spec.
+ * Prose arrives as an ordinary paragraph — same font, no frame, nothing to
+ * distinguish it from what the reader typed except the source it carries as an
+ * attribute. Figures and tables cannot be text, so they stay as placed objects
+ * backed by their spec.
  */
 export function addClip(noteId, clip) {
   const n = noteById(noteId);
   if (!n) return null;
 
   if (clip.kind === 'text' || clip.kind === 'question') {
-    const src = [clip.source, clip.qid].filter(Boolean).join(' · ');
-    n.html = `${n.html || ''}<blockquote class="doc-quote"`
-      + ` data-src="${attr(src)}"`
-      + (clip.color ? ` data-hl="${attr(clip.color)}"` : '')
-      + `><p>${escText(clip.text)}</p></blockquote><p><br></p>`;
+    n.html = `${n.html || ''}<p data-src="${attr(clip.source || '')}"`
+      + (clip.qid ? ` data-qid="${attr(clip.qid)}"` : '')
+      + `>${escText(clip.text)}</p><p><br></p>`;
     n.updated = Date.now();
     changed('notes', noteId);
     return null;
@@ -327,9 +327,10 @@ export function addClip(noteId, clip) {
 
   const rec = { id: uid('c'), at: Date.now(), ...clip };
   n.clips.push(rec);
-  n.html = `${n.html || ''}<div class="doc-clip" contenteditable="false"`
+  n.html = `${n.html || ''}<div class="doc-obj" contenteditable="false"`
     + ` data-clip="${rec.id}" data-kind="${attr(rec.kind)}"`
-    + ` data-summary="${attr(clipSummary(rec))}"></div><p><br></p>`;
+    + (clip.qid ? ` data-qid="${attr(clip.qid)}"` : '')
+    + ` data-src="${attr(clip.source || '')}"></div><p><br></p>`;
   n.updated = Date.now();
   changed('notes', noteId);
   return rec;
@@ -343,7 +344,7 @@ export function removeClip(noteId, clipId) {
   if (n.html) {
     const box = document.createElement('div');
     box.innerHTML = n.html;
-    box.querySelector(`.doc-clip[data-clip="${CSS.escape(clipId)}"]`)?.remove();
+    box.querySelector(`.doc-obj[data-clip="${CSS.escape(clipId)}"]`)?.remove();
     n.html = box.innerHTML;
   }
   n.updated = Date.now();

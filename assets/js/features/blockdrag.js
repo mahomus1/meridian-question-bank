@@ -58,7 +58,7 @@ export function enableBlockDrag(wrap, doc, onReorder) {
     drop = null;
     dragging.classList.add('is-dragging');
     document.body.classList.add('dragging-block');
-    scroller = doc.closest('.nb-edit-body') || doc.parentElement;
+    scroller = doc.closest('.panel__body') || doc.parentElement;
 
     addEventListener('pointermove', onMove);
     addEventListener('pointerup', onUp, { once: true });
@@ -137,7 +137,7 @@ export function enableBlockDrag(wrap, doc, onReorder) {
     if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); finish(false); }
   }
 
-  const isText = (el) => !el.classList.contains('doc-clip');
+  const isText = (el) => !el.classList.contains('doc-obj');
 
   /* ── wiring ───────────────────────────────────────────────────────────── */
 

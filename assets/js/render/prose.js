@@ -161,7 +161,7 @@ export function excerpt(src, max = 140) {
 export function htmlToText(html) {
   const box = document.createElement('div');
   box.innerHTML = String(html || '');
-  box.querySelectorAll('.doc-clip').forEach((el) => {
+  box.querySelectorAll('.doc-obj').forEach((el) => {
     el.replaceWith(document.createTextNode(` ${el.dataset.summary || ''} `));
   });
   // Blocks carry no whitespace of their own, so their text would otherwise
@@ -170,58 +170,4 @@ export function htmlToText(html) {
     el.appendChild(document.createTextNode(' '));
   });
   return box.textContent.replace(/\s+/g, ' ').trim();
-}
-
-/**
- * Serialise the document editor back to Markdown for export.
- * `clipMd` turns a clip id into its markdown form.
- */
-export function htmlToMarkdown(html, clipMd = () => '') {
-  const box = document.createElement('div');
-  box.innerHTML = String(html || '');
-  const out = [];
-
-  const inlineMd = (node) => {
-    let s = '';
-    for (const n of node.childNodes) {
-      if (n.nodeType === Node.TEXT_NODE) { s += n.nodeValue; continue; }
-      const tag = n.tagName?.toLowerCase();
-      const inner = inlineMd(n);
-      if (tag === 'b' || tag === 'strong') s += `**${inner}**`;
-      else if (tag === 'i' || tag === 'em') s += `*${inner}*`;
-      else if (tag === 'code') s += `\`${inner}\``;
-      else if (tag === 'a') s += `[${inner}](${n.getAttribute('href') || ''})`;
-      else if (tag === 'br') s += '\n';
-      else s += inner;
-    }
-    return s;
-  };
-
-  // contenteditable wraps new blocks in <div> in some browsers, so unknown
-  // wrappers are walked through rather than flattened into a paragraph.
-  const emit = (el) => {
-    const tag = el.tagName.toLowerCase();
-    if (el.classList.contains('doc-clip')) { out.push(clipMd(el.dataset.clip), ''); return; }
-    if (tag === 'h1' || tag === 'h2' || tag === 'h3') {
-      out.push(`${'#'.repeat(Number(tag[1]))} ${inlineMd(el)}`, '');
-    } else if (tag === 'ul' || tag === 'ol') {
-      [...el.children].forEach((li, i) => out.push(`${tag === 'ul' ? '-' : `${i + 1}.`} ${inlineMd(li)}`));
-      out.push('');
-    } else if (tag === 'blockquote') {
-      const src = el.getAttribute('data-src');
-      out.push(`> ${inlineMd(el).trim().replace(/\n/g, '\n> ')}`);
-      if (src) out.push('>', `> — ${src}`);
-      out.push('');
-    } else if (tag === 'hr') {
-      out.push('---', '');
-    } else if ((tag === 'div' || tag === 'p') && el.querySelector('ul, ol, blockquote, h1, h2, h3')) {
-      [...el.children].forEach(emit);
-    } else {
-      const t = inlineMd(el).trim();
-      if (t) out.push(t, '');
-    }
-  };
-
-  [...box.children].forEach(emit);
-  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }

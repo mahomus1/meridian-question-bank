@@ -13,10 +13,7 @@ import { clock, secs } from '../core/fmt.js';
 import { block } from '../render/prose.js';
 import { vignette, explanation as explanationBlock } from '../render/item.js';
 import { attachHighlighter, highlightSelection, hidePopover } from '../features/highlight.js';
-import {
-  clipFigure, clipTable, clipQuestion, clipText,
-  chooseTarget, targetLabel, writeNote,
-} from '../features/capture.js';
+import { clipFigure, clipTable, clipQuestion } from '../features/capture.js';
 import { toast, confirm, modal } from '../features/overlay.js';
 import { diffPips, catTag, empty } from './parts.js';
 
@@ -43,22 +40,15 @@ export default async function runner({ id }) {
   let itemStart = 0;
   let ticker = null;
   let remaining = test.timerSecs || 0;
-  let showRail = store.prefs().showRail !== false;
 
   /* ── skeleton ───────────────────────────────────────────────────────── */
 
   const barHost = h('div.runner__bar');
   const mainHost = h('div.runner__main');
-  const railHost = h('aside.runner__rail');
   const footHost = h('div.runner__foot');
-  const bodyHost = h('div.runner__body', mainHost, railHost);
+  const bodyHost = h('div.runner__body', mainHost);
   const el = h('div.runner', barHost, bodyHost, footHost);
 
-  const applyRail = () => {
-    bodyHost.classList.toggle('has-rail', showRail);
-    railHost.hidden = !showRail;
-  };
-  applyRail();
 
   /* ── timing ─────────────────────────────────────────────────────────── */
 
@@ -172,7 +162,6 @@ export default async function runner({ id }) {
     drawItem();
     drawBar();
     drawFoot();
-    drawRail();
     startTicker();
     mainHost.scrollTop = 0;
 
@@ -234,7 +223,7 @@ export default async function runner({ id }) {
     detachHl?.();
     detachHl = attachHighlighter(inner, {
       qid: q.id,
-      onChange: () => drawRail(),
+      onChange: () => {},
     });
   }
 
@@ -334,7 +323,6 @@ export default async function runner({ id }) {
     drawItem();
     drawBar();
     drawFoot();
-    drawRail();
     mainHost.querySelector('.expl')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -415,96 +403,6 @@ export default async function runner({ id }) {
 
   /* ── rail ───────────────────────────────────────────────────────────── */
 
-  let composerDraft = '';
-
-  function drawRail() {
-    if (!q) return;
-    const hls = store.highlightsFor(q.id);
-    const dest = targetLabel(q.id);
-
-    const composer = h('textarea.rail-composer', {
-      placeholder: 'Write a note on this item…  ⌘↵ to save',
-      value: composerDraft,
-      rows: 4,
-      oninput: (ev) => { composerDraft = ev.target.value; },
-      onkeydown: (ev) => {
-        if (ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey)) { ev.preventDefault(); commit(); }
-      },
-    });
-
-    const commit = () => {
-      const text = composer.value.trim();
-      if (!text) { toast('Nothing to save yet.'); return; }
-      writeNote({ qid: q.id, text });
-      composerDraft = '';
-      drawRail();
-    };
-
-    fill(railHost,
-      h('div.rail-head',
-        h('h3', 'Notebook'),
-        h('div.push.row', { style: { gap: '6px' } },
-          h('button.btn.btn--sm.btn--icon', {
-            title: 'Hide this panel', 'aria-label': 'Hide panel',
-            onclick: () => { showRail = false; store.setPref('showRail', false); applyRail(); },
-          }, '✕'))),
-
-      h('div.rail-body',
-        /* where clippings land */
-        h('div.dest',
-          h('div.label', 'Saving to'),
-          h('button.dest__pick', {
-            title: 'Change where clippings are saved',
-            onclick: () => chooseTarget({ qid: q.id, onPick: () => drawRail() }),
-          },
-            h('span.dot', { style: { background: dest.color } }),
-            h('span.dest__t.grow.truncate',
-              h('b', dest.title),
-              h('small', dest.pinned ? dest.bookName : 'per-question note')),
-            h('span.dest__chev', '▾')),
-          dest.note
-            ? h('button.btn.btn--sm.btn--ghost.btn--block', {
-              onclick: () => go(`/notebook/${dest.note.id}`),
-            }, 'Open this note')
-            : null),
-
-        /* write without leaving the item */
-        h('div.stack-6',
-          h('div.label', 'Quick note'),
-          composer,
-          h('button.btn.btn--primary.btn--block', { onclick: commit }, 'Save note')),
-
-        /* highlights */
-        h('div.label', { style: { marginTop: '4px' } }, `Highlights · ${hls.length}`),
-        hls.length
-          ? hls.map((hl) => {
-            const el2 = mainHost.querySelector(`mark.hl[data-id="${hl.id}"]`);
-            const text = el2?.textContent || '(passage no longer visible)';
-            return h('div.hl-item',
-              h('div.row', { style: { alignItems: 'stretch', gap: '9px' } },
-                h('div.hl-item__bar', { style: { background: `var(--hl-${hl.c})` } }),
-                h('div.hl-item__q.grow', text)),
-              h('div.hl-item__act',
-                h('button.btn.btn--sm', {
-                  onclick: () => {
-                    const note = clipText({ qid: q.id, text, source: 'Highlight', color: hl.c });
-                    if (note) store.updateHighlight(q.id, hl.id, { note: note.id });
-                    drawItem();
-                    drawRail();
-                  },
-                }, 'To notebook'),
-                h('button.btn.btn--sm.btn--ghost', {
-                  onclick: () => {
-                    store.removeHighlight(q.id, hl.id);
-                    drawItem();
-                    drawRail();
-                  },
-                }, 'Remove')));
-          })
-          : h('p.xs.muted', 'Select any passage in the vignette or explanation to highlight it, then send it here.'),
-      ));
-  }
-
   /* ── reference values ───────────────────────────────────────────────── */
 
   async function showReference() {
@@ -528,7 +426,6 @@ export default async function runner({ id }) {
     const el2 = document.activeElement;
     if (el2 && (el2.tagName === 'INPUT' || el2.tagName === 'TEXTAREA' || el2.isContentEditable)) return;
     if (ev.metaKey || ev.ctrlKey) {
-      if (ev.key === '\\') { ev.preventDefault(); showRail = !showRail; store.setPref('showRail', showRail); applyRail(); }
       return;
     }
     if (!q) return;
@@ -557,7 +454,7 @@ export default async function runner({ id }) {
       case 'm': case 'M':
         ev.preventDefault(); store.toggleMark(q.id); drawItem(); drawBar(); break;
       case 'h': case 'H':
-        if (highlightSelection('yellow')) { ev.preventDefault(); drawRail(); }
+        if (highlightSelection('yellow')) ev.preventDefault();
         break;
       case 'l': case 'L': ev.preventDefault(); showReference(); break;
       default: break;
@@ -574,10 +471,6 @@ export default async function runner({ id }) {
     subtitle: `${tutor ? 'Tutor mode' : 'Timed exam'}${test.timerSecs ? ` · ${secs(test.timerSecs)} per item` : ' · untimed'}`,
     actions: [
       h('button.btn.btn--sm', { onclick: showReference, title: 'Reference intervals (L)' }, 'Lab values'),
-      h('button.btn.btn--sm', {
-        onclick: () => { showRail = !showRail; store.setPref('showRail', showRail); applyRail(); },
-        title: 'Toggle the side panel (⌘\\)',
-      }, 'Panel'),
       h('button.btn.btn--sm', {
         onclick: () => { bankTime(); store.updateTest(test.id, {}); toast('Test suspended — resume it from the overview.'); go('/'); },
       }, 'Suspend'),

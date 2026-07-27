@@ -5,6 +5,7 @@ import * as store from './core/store.js';
 import { loadIndex, bank, filterItems } from './core/bank.js';
 import { route, start, go, render as rerender, here } from './core/router.js';
 import { toast } from './features/overlay.js';
+import * as panel from './features/notepanel.js';
 import { n as num } from './core/fmt.js';
 
 /* ── theme ────────────────────────────────────────────────────────────── */
@@ -40,7 +41,14 @@ function paintTopbar(view) {
     h('div.topbar__title',
       h('h1', view.title || 'Meridian'),
       view.subtitle && h('p', view.subtitle)),
-    view.actions && h('div.topbar__actions', view.actions),
+    h('div.topbar__actions',
+      view.actions || null,
+      h('button.btn.btn--sm', {
+        'data-panel-toggle': '',
+        'aria-pressed': String(panel.isOpen()),
+        title: 'Notebook  ⌘J',
+        onclick: () => panel.toggle(),
+      }, 'Notebook')),
   );
 }
 
@@ -233,6 +241,9 @@ addEventListener('keydown', (ev) => {
   if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'k') {
     ev.preventDefault(); openPalette(); return;
   }
+  if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'j') {
+    ev.preventDefault(); panel.toggle(); return;
+  }
   if (isTyping() || ev.metaKey || ev.ctrlKey || ev.altKey) return;
 
   if (ev.key === '/') { ev.preventDefault(); openPalette(); }
@@ -261,6 +272,7 @@ async function boot() {
   }
 
   $('#app').hidden = false;
+  panel.mount();
   start(paint);
   paintRail();
 

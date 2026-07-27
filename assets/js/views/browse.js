@@ -10,7 +10,8 @@ import { go } from '../core/router.js';
 import { n, pct } from '../core/fmt.js';
 import { vignette, explanation, staticChoices } from '../render/item.js';
 import { attachHighlighter, highlightSelection, hidePopover } from '../features/highlight.js';
-import { clipFigure, clipTable, clipQuestion, noteForQuestion } from '../features/capture.js';
+import { clipFigure, clipTable, clipQuestion } from '../features/capture.js';
+import { setOpen } from '../features/notepanel.js';
 import { toast } from '../features/overlay.js';
 import { diffPips, catTag, statusPip, empty } from './parts.js';
 
@@ -250,7 +251,7 @@ async function reader(id) {
     subtitle: `${cat(q.cat).name} · ${q.archetypeLabel} · ${q.peer.pct}% answered correctly`,
     actions: [
       h('button.btn.btn--sm', {
-        onclick: () => go(`/notebook/${noteForQuestion(id).id}`),
+        onclick: () => setOpen(true),
       }, 'Notes'),
     ],
     el,
