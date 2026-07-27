@@ -10,7 +10,7 @@ import { h, fill, $ } from '../core/dom.js';
 import * as store from '../core/store.js';
 import { paint } from '../render/prose.js';
 import { toast } from './overlay.js';
-import { clipText, noteForQuestion } from './capture.js';
+import { clipText, targetNote } from './capture.js';
 import { go } from '../core/router.js';
 
 export const COLORS = [
@@ -168,7 +168,7 @@ function popForHighlight(markEl) {
       : h('button.sel-pop__btn', {
         type: 'button',
         onclick: () => {
-          const note = noteForQuestion(qid);
+          const note = targetNote(qid);
           store.addClip(note.id, {
             kind: 'text', qid, text: markEl.textContent,
             source: sourceLabel(blockId, active.root), color: hl.c,

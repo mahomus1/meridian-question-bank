@@ -12,7 +12,8 @@ import { ago, n, stamp } from '../core/fmt.js';
 import { markdown, excerpt } from '../render/prose.js';
 import { figureSvg } from '../render/figure.js';
 import { tableBlock } from '../render/table.js';
-import { toast, confirm, prompt } from '../features/overlay.js';
+import { toast, confirm, prompt, modal } from '../features/overlay.js';
+import { chooseTarget } from '../features/capture.js';
 import { empty } from './parts.js';
 
 export default async function notebook({ noteId }) {
@@ -36,33 +37,43 @@ export default async function notebook({ noteId }) {
 
     const tags = new Map();
     for (const nt of store.state.notes) for (const t of nt.tags || []) tags.set(t, (tags.get(t) || 0) + 1);
-    const topTags = [...tags.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+    const topTags = [...tags.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+    const pinnedId = store.captureTarget()?.id || null;
 
     fill(railHost,
       h('div.filter-group',
-        h('div.row',
-          h('span.label.grow', 'Notebooks'),
-          h('button.btn.btn--sm.btn--icon.btn--ghost', {
-            title: 'New notebook', 'aria-label': 'New notebook',
-            onclick: async () => {
-              const name = await prompt({ title: 'New notebook', label: 'Name', placeholder: 'e.g. Cardiology revision' });
-              if (name) { store.createNotebook(name); draw(); }
-            },
-          }, '+')),
+        h('span.label', 'Notebooks'),
         h('div.filter-list',
           h('button.filter-row', {
             'aria-pressed': String(bookFilter === 'all'),
             onclick: () => { bookFilter = 'all'; draw(); },
-          }, h('span.truncate', 'All notes'), h('small', n(store.state.notes.length))),
-          store.state.notebooks.map((b) => h('button.filter-row', {
-            'aria-pressed': String(bookFilter === b.id),
-            onclick: () => { bookFilter = b.id; draw(); },
-            oncontextmenu: async (ev) => {
-              ev.preventDefault();
-              const name = await prompt({ title: 'Rename notebook', label: 'Name', value: b.name });
-              if (name) { store.renameNotebook(b.id, name); draw(); }
+          }, h('span.truncate.grow', 'All notes'), h('small', n(store.state.notes.length))),
+
+          store.state.notebooks.map((b) => h('div.book-row',
+            h('button.filter-row.grow', {
+              'aria-pressed': String(bookFilter === b.id),
+              onclick: () => { bookFilter = b.id; draw(); },
             },
-          }, h('span.truncate', b.name), h('small', n(counts[b.id] || 0))))),
+              h('span.dot', { style: { background: b.color } }),
+              h('span.truncate.grow', b.name),
+              h('small', n(counts[b.id] || 0))),
+            h('button.book-row__menu', {
+              title: `Manage ${b.name}`, 'aria-label': `Manage ${b.name}`,
+              onclick: () => manageNotebook(b),
+            }, '···'))),
+
+          h('button.filter-row.filter-row--add', {
+            onclick: async () => {
+              const name = await prompt({
+                title: 'New notebook', label: 'Name',
+                placeholder: 'e.g. Cardiology revision', ok: 'Create',
+              });
+              if (!name) return;
+              const book = store.createNotebook(name);
+              bookFilter = book.id;
+              draw();
+            },
+          }, h('span', '+'), h('span.grow', 'New notebook'))),
       ),
 
       topTags.length
@@ -76,8 +87,76 @@ export default async function notebook({ noteId }) {
         : null,
 
       h('div.filter-group',
+        h('span.label', 'Clippings go to'),
+        h('button.dest__pick', {
+          onclick: () => chooseTarget({ onPick: () => draw() }),
+        },
+          h('span.dot', { style: { background: pinnedId ? (store.notebookById(store.captureTarget().book)?.color || 'var(--blue)') : 'var(--ink-4)' } }),
+          h('span.dest__t.grow.truncate',
+            h('b', pinnedId ? (store.captureTarget().title || 'Untitled note') : 'Per-question notes'),
+            h('small', pinnedId ? 'pinned destination' : 'a note for each question')),
+          h('span.dest__chev', '▾'))),
+
+      h('div.filter-group',
         h('button.btn.btn--sm.btn--block', { onclick: exportAll }, 'Export all as Markdown')),
     );
+  }
+
+  async function manageNotebook(book) {
+    const swatches = h('div.row.row--wrap', { style: { gap: '6px' } },
+      store.BOOK_COLORS.map((c) => h('button.sw', {
+        'aria-pressed': String(book.color === c),
+        style: { background: c },
+        title: 'Set colour', 'aria-label': `Set colour ${c}`,
+        onclick: (ev) => {
+          store.updateNotebook(book.id, { color: c });
+          ev.currentTarget.parentElement.querySelectorAll('.sw')
+            .forEach((s) => s.setAttribute('aria-pressed', 'false'));
+          ev.currentTarget.setAttribute('aria-pressed', 'true');
+          draw();
+        },
+      })));
+
+    const nameField = h('input.input', { type: 'text', value: book.name });
+    const noteCount = store.state.notes.filter((x) => x.book === book.id).length;
+    const canDelete = store.state.notebooks.length > 1;
+
+    modal({
+      title: 'Notebook',
+      desc: `${noteCount} note${noteCount === 1 ? '' : 's'}`,
+      body: h('div.stack-16',
+        h('label.field', h('span.label', 'Name'), nameField),
+        h('div.field', h('span.label', 'Colour'), swatches)),
+      actions: (close) => [
+        canDelete
+          ? h('button.btn.btn--danger', {
+            onclick: async () => {
+              close();
+              const ok = await confirm({
+                title: `Delete “${book.name}”?`,
+                desc: noteCount
+                  ? `Its ${noteCount} note${noteCount === 1 ? '' : 's'} will move to ${store.state.notebooks.find((x) => x.id !== book.id).name}.`
+                  : 'This notebook is empty.',
+                ok: 'Delete notebook', danger: true,
+              });
+              if (!ok) return;
+              store.deleteNotebook(book.id);
+              if (bookFilter === book.id) bookFilter = 'all';
+              draw();
+              toast('Notebook deleted');
+            },
+          }, 'Delete')
+          : null,
+        h('button.btn.btn--primary', {
+          onclick: () => {
+            const name = nameField.value.trim();
+            if (name) store.renameNotebook(book.id, name);
+            close();
+            draw();
+          },
+        }, 'Done'),
+      ].filter(Boolean),
+    });
   }
 
   /* ── note list ──────────────────────────────────────────────────────── */
@@ -116,9 +195,14 @@ export default async function notebook({ noteId }) {
             'aria-current': String(current?.id === nt.id),
             onclick: () => { current = nt; go(`/notebook/${nt.id}`); },
           },
-            h('div.nb-item__t', nt.title || 'Untitled note'),
+            h('div.nb-item__t',
+              store.captureTarget()?.id === nt.id
+                ? h('span', { title: 'Clippings are collecting here', style: { color: 'var(--blue)' } }, '★ ')
+                : null,
+              nt.title || 'Untitled note'),
             h('div.nb-item__p', excerpt(nt.body) || (nt.clips.length ? `${nt.clips.length} clipping${nt.clips.length === 1 ? '' : 's'}` : 'Empty')),
             h('div.nb-item__m',
+              h('span.dot', { style: { background: store.notebookById(nt.book)?.color || 'var(--ink-4)', width: '6px', height: '6px' } }),
               h('span', ago(nt.updated)),
               nt.clips.length ? h('span', '·') : null,
               nt.clips.length ? h('span', `${nt.clips.length} clip${nt.clips.length === 1 ? '' : 's'}`) : null,
@@ -173,6 +257,19 @@ export default async function notebook({ noteId }) {
             style: { width: 'auto' },
             onchange: (ev) => { store.updateNote(nt.id, { book: ev.target.value }); draw(); },
           }, store.state.notebooks.map((b) => h('option', { value: b.id, selected: b.id === nt.book }, b.name))),
+          h('button.btn.btn--sm', {
+            'aria-pressed': String(store.captureTarget()?.id === nt.id),
+            style: store.captureTarget()?.id === nt.id
+              ? { color: 'var(--blue)', borderColor: 'var(--blue-2)' } : null,
+            title: 'Send clippings from questions to this note',
+            onclick: () => {
+              const on = store.captureTarget()?.id === nt.id;
+              store.setCaptureTarget(on ? null : nt.id);
+              toast(on ? 'Clippings go to a note per question'
+                : `Clippings now go to “${nt.title || 'Untitled note'}”`);
+              draw();
+            },
+          }, store.captureTarget()?.id === nt.id ? '★ Collecting' : '☆ Collect here'),
           nt.qid ? h('button.btn.btn--sm', { onclick: () => go(`/browse/${nt.qid}`) }, 'Open item') : null,
           h('button.btn.btn--sm', { onclick: () => exportNote(nt) }, 'Export'),
           h('button.btn.btn--sm.btn--danger', {

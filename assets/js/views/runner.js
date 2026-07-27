@@ -13,7 +13,10 @@ import { clock, secs } from '../core/fmt.js';
 import { block } from '../render/prose.js';
 import { vignette, explanation as explanationBlock } from '../render/item.js';
 import { attachHighlighter, highlightSelection, hidePopover } from '../features/highlight.js';
-import { clipFigure, clipTable, clipQuestion, clipText, noteForQuestion } from '../features/capture.js';
+import {
+  clipFigure, clipTable, clipQuestion, clipText,
+  chooseTarget, targetLabel, writeNote,
+} from '../features/capture.js';
 import { toast, confirm, modal } from '../features/overlay.js';
 import { diffPips, catTag, empty } from './parts.js';
 
@@ -214,6 +217,12 @@ export default async function runner({ id }) {
       h('div.choices', { role: 'group', 'aria-label': 'Answer choices' },
         q.choices.map((c) => choiceRow(c, { locked, picked, reveal }))),
 
+      // Shown until the reader rules a choice out for the first time, then
+      // never again — the control itself is enough once you know it is there.
+      !reveal && !store.prefs().seenRuleOut
+        ? h('p.hint', 'Tip — rule a choice out with the ⊘ beside it, by right-clicking it, or with ⌥-click.')
+        : null,
+
       reveal ? explanation() : null,
     );
 
@@ -234,19 +243,27 @@ export default async function runner({ id }) {
     const isPick = picked === c.k;
     const isKey = c.k === q.key;
 
-    let cls = 'button.choice';
+    // A row rather than a <button>, because it carries its own rule-out button
+    // and a button may not nest inside another.
+    let cls = 'div.choice';
     if (struck) cls += '.choice--struck';
     if (reveal && isKey) cls += '.choice--right';
     else if (reveal && isPick && !isKey) cls += '.choice--wrong';
 
+    const choose = () => { if (!(locked && tutor)) pick(c.k); };
+
     return h(cls, {
-      type: 'button',
+      role: 'button',
+      tabindex: locked && tutor ? -1 : 0,
       'aria-pressed': String(isPick),
-      disabled: locked && tutor,
+      'aria-disabled': String(locked && tutor),
       onclick: (ev) => {
+        if (ev.target.closest('.choice__x')) return;   // its own button handles this
         if (ev.altKey) { strike(c.k); return; }
-        if (locked && tutor) return;
-        pick(c.k);
+        choose();
+      },
+      onkeydown: (ev) => {
+        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); choose(); }
       },
       oncontextmenu: (ev) => { ev.preventDefault(); strike(c.k); },
     },
@@ -254,6 +271,17 @@ export default async function runner({ id }) {
       h('span.choice__t', c.t),
       reveal && store.prefs().showPeer
         ? h('span.choice__pct', `${c.share}%`)
+        : null,
+      // Ruling a choice out is a real part of working an item, so it gets a
+      // control of its own rather than living only on a hidden right-click.
+      !reveal
+        ? h('button.choice__x', {
+          type: 'button',
+          'aria-pressed': String(struck),
+          title: struck ? `Bring ${c.k} back` : `Rule out ${c.k}  (right-click or ⌥-click)`,
+          'aria-label': struck ? `Bring choice ${c.k} back` : `Rule out choice ${c.k}`,
+          onclick: (ev) => { ev.stopPropagation(); strike(c.k); },
+        }, struck ? '↺' : '⊘')
         : null,
       reveal ? h('span.choice__bar', {
         style: { width: `${c.share}%`, background: isKey ? '#3f8f5f' : 'var(--ink-4)' },
@@ -285,6 +313,7 @@ export default async function runner({ id }) {
     const i = list.indexOf(letter);
     if (i < 0) list.push(letter); else list.splice(i, 1);
     if (test.picks[q.id] === letter && i < 0) delete test.picks[q.id];
+    if (!store.prefs().seenRuleOut) store.setPref('seenRuleOut', true);
     store.updateTest(test.id, {});
     drawItem();
     drawFoot();
@@ -386,28 +415,67 @@ export default async function runner({ id }) {
 
   /* ── rail ───────────────────────────────────────────────────────────── */
 
+  let composerDraft = '';
+
   function drawRail() {
     if (!q) return;
     const hls = store.highlightsFor(q.id);
-    const notes = store.notesFor(q.id);
+    const dest = targetLabel(q.id);
+
+    const composer = h('textarea.rail-composer', {
+      placeholder: 'Write a note on this item…  ⌘↵ to save',
+      value: composerDraft,
+      rows: 4,
+      oninput: (ev) => { composerDraft = ev.target.value; },
+      onkeydown: (ev) => {
+        if (ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey)) { ev.preventDefault(); commit(); }
+      },
+    });
+
+    const commit = () => {
+      const text = composer.value.trim();
+      if (!text) { toast('Nothing to save yet.'); return; }
+      writeNote({ qid: q.id, text });
+      composerDraft = '';
+      drawRail();
+    };
 
     fill(railHost,
       h('div.rail-head',
-        h('h3', 'This item'),
+        h('h3', 'Notebook'),
         h('div.push.row', { style: { gap: '6px' } },
-          h('button.btn.btn--sm', {
-            onclick: () => {
-              const note = noteForQuestion(q.id);
-              go(`/notebook/${note.id}`);
-            },
-          }, 'Open notes'),
           h('button.btn.btn--sm.btn--icon', {
             title: 'Hide this panel', 'aria-label': 'Hide panel',
             onclick: () => { showRail = false; store.setPref('showRail', false); applyRail(); },
           }, '✕'))),
 
       h('div.rail-body',
-        h('div.label', `Highlights · ${hls.length}`),
+        /* where clippings land */
+        h('div.dest',
+          h('div.label', 'Saving to'),
+          h('button.dest__pick', {
+            title: 'Change where clippings are saved',
+            onclick: () => chooseTarget({ qid: q.id, onPick: () => drawRail() }),
+          },
+            h('span.dot', { style: { background: dest.color } }),
+            h('span.dest__t.grow.truncate',
+              h('b', dest.title),
+              h('small', dest.pinned ? dest.bookName : 'per-question note')),
+            h('span.dest__chev', '▾')),
+          dest.note
+            ? h('button.btn.btn--sm.btn--ghost.btn--block', {
+              onclick: () => go(`/notebook/${dest.note.id}`),
+            }, 'Open this note')
+            : null),
+
+        /* write without leaving the item */
+        h('div.stack-6',
+          h('div.label', 'Quick note'),
+          composer,
+          h('button.btn.btn--primary.btn--block', { onclick: commit }, 'Save note')),
+
+        /* highlights */
+        h('div.label', { style: { marginTop: '4px' } }, `Highlights · ${hls.length}`),
         hls.length
           ? hls.map((hl) => {
             const el2 = mainHost.querySelector(`mark.hl[data-id="${hl.id}"]`);
@@ -419,8 +487,9 @@ export default async function runner({ id }) {
               h('div.hl-item__act',
                 h('button.btn.btn--sm', {
                   onclick: () => {
-                    clipText({ qid: q.id, text, source: 'Highlight', color: hl.c });
-                    store.updateHighlight(q.id, hl.id, { note: store.notesFor(q.id)[0]?.id });
+                    const note = clipText({ qid: q.id, text, source: 'Highlight', color: hl.c });
+                    if (note) store.updateHighlight(q.id, hl.id, { note: note.id });
+                    drawItem();
                     drawRail();
                   },
                 }, 'To notebook'),
@@ -432,25 +501,7 @@ export default async function runner({ id }) {
                   },
                 }, 'Remove')));
           })
-          : h('p.xs.muted', 'Select any passage in the item to highlight it. Highlights are saved with the question.'),
-
-        h('div.label', { style: { marginTop: '8px' } }, `Notes · ${notes.length}`),
-        notes.length
-          ? notes.map((nt) => h('button.note-mini', {
-            onclick: () => go(`/notebook/${nt.id}`),
-          },
-            h('b', nt.title || 'Untitled note'),
-            h('p', nt.clips.length
-              ? `${nt.clips.length} clip${nt.clips.length === 1 ? '' : 's'}`
-              : (nt.body || 'Empty note').slice(0, 90))))
-          : h('p.xs.muted', 'No notes on this item yet.'),
-
-        h('button.btn.btn--block', {
-          onclick: () => {
-            const note = noteForQuestion(q.id);
-            go(`/notebook/${note.id}`);
-          },
-        }, 'Take a note'),
+          : h('p.xs.muted', 'Select any passage in the vignette or explanation to highlight it, then send it here.'),
       ));
   }
 

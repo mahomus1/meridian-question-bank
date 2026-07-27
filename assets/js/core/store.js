@@ -26,7 +26,14 @@ const BLANK = () => ({
   notebooks: [],
   notes: [],
   highlights: {},  // qid -> [{ id, b, s, e, c, note }]
+  capture: { noteId: null },   // where clippings land until you change it
 });
+
+/** Muted palette for notebooks, so a shelf of them stays scannable. */
+export const BOOK_COLORS = [
+  '#4f7fd1', '#3f8f5f', '#c08a2a', '#b45445',
+  '#8f6fd1', '#4fb0c6', '#d1608f', '#7a8ec9',
+];
 
 function load() {
   try {
@@ -180,23 +187,40 @@ export const activeTest = () => state.tests.find((t) => t.status === 'active') |
 
 export function ensureNotebook() {
   if (!state.notebooks.length) {
-    state.notebooks.push({ id: uid('nb'), name: 'General', created: Date.now() });
+    state.notebooks.push({
+      id: uid('nb'), name: 'General', color: BOOK_COLORS[0], created: Date.now(),
+    });
     save();
+  }
+  // Notebooks created before colours existed still need one.
+  for (const [i, nb] of state.notebooks.entries()) {
+    if (!nb.color) nb.color = BOOK_COLORS[i % BOOK_COLORS.length];
   }
   return state.notebooks[0];
 }
 
-export function createNotebook(name) {
-  const nb = { id: uid('nb'), name: name || 'Untitled notebook', created: Date.now() };
+export function createNotebook(name, color) {
+  const nb = {
+    id: uid('nb'),
+    name: name || 'Untitled notebook',
+    color: color || BOOK_COLORS[state.notebooks.length % BOOK_COLORS.length],
+    created: Date.now(),
+  };
   state.notebooks.push(nb);
   changed('notebooks', nb.id);
   return nb;
 }
 
-export function renameNotebook(id, name) {
+export function updateNotebook(id, patch) {
   const nb = state.notebooks.find((n) => n.id === id);
-  if (nb) { nb.name = name; changed('notebooks', id); }
+  if (!nb) return null;
+  Object.assign(nb, patch);
+  changed('notebooks', id);
+  return nb;
 }
+
+export const renameNotebook = (id, name) => updateNotebook(id, { name });
+export const notebookById = (id) => state.notebooks.find((n) => n.id === id) || null;
 
 export function deleteNotebook(id) {
   if (state.notebooks.length <= 1) return false;
@@ -235,9 +259,25 @@ export function updateNote(id, patch) {
   return n;
 }
 
+/* ── capture target ───────────────────────────────────────────────────── */
+
+/** The note that clippings land in until the reader points it somewhere else. */
+export function captureTarget() {
+  const id = state.capture?.noteId;
+  return id ? noteById(id) : null;
+}
+
+export function setCaptureTarget(noteId) {
+  if (!state.capture) state.capture = { noteId: null };
+  state.capture.noteId = noteId;
+  changed('capture', noteId);
+  return captureTarget();
+}
+
 export function deleteNote(id) {
   const i = state.notes.findIndex((n) => n.id === id);
   if (i < 0) return;
+  if (state.capture?.noteId === id) state.capture.noteId = null;
   // Detach any highlight that pointed at this note.
   for (const list of Object.values(state.highlights)) {
     for (const hl of list) if (hl.note === id) delete hl.note;

@@ -29,17 +29,34 @@ answered it correctly, which places it in one of four bands — Foundational (78
 and above), Standard (62–77%), Challenging (48–61%), Rigorous (below 48%). After
 you answer, you see the full answer distribution and how your time compares.
 
+**Rule choices out.** Working an item usually means eliminating before
+committing. Every choice carries a ⊘ control, and right-click or ⌥-click does
+the same. Ruled-out choices grey out and strike through, and can be brought
+back. A one-time tip points the control out, then never appears again.
+
 **Highlight and clip.** Select any passage in a vignette or explanation to
 highlight it in one of four colours. Highlights are stored as character offsets
 against a stable block id, so they survive reloads and re-renders. Figures and
 tables in explanations carry their own *Save to notebook* action, and a clipped
 figure keeps its spec — so it redraws with the theme rather than pasting a stale
-image.
+image. The **Highlights** page collects every passage you have marked across the
+bank, filterable by colour and category, each one a click from its item.
 
-**A real notebook.** Notebooks, notes, tags, and search. Markdown with a
+**A notebook you organise.** Notebooks are folders you create, name, colour, and
+delete; notes live in one notebook and carry any number of tags. Markdown with a
 formatting toolbar and a preview mode. Clippings render inline with a link back
 to the question they came from. Export a single note or the whole notebook as
 Markdown.
+
+**One visible destination.** Clippings go to the note you have pinned, shown at
+all times in the item panel as *Saving to → …*. Click it to switch note, switch
+notebook, create either, or fall back to a note per question. Nothing is ever
+filed somewhere you did not choose.
+
+**Write without leaving the item.** The item panel holds a composer, so a
+thought during a question goes straight into the destination note — with the
+topic and item id appended as provenance — without navigating away and losing
+your place. ⌘↵ saves.
 
 **Know where you stand.** Accuracy over time, by category, and by difficulty,
 each with the peer average marked for comparison, plus coverage of the bank.
@@ -50,10 +67,10 @@ Any static file server works. The app fetches JSON, so opening `index.html`
 directly from the filesystem will not work — browsers block local data files.
 
 ```bash
-python3 tools/serve.py 4173
+python3 tools/serve.py 4177
 ```
 
-Then open <http://localhost:4173>.
+Then open <http://localhost:4177>.
 
 ## Regenerating the bank
 
@@ -89,7 +106,8 @@ app only depends on the shape of the emitted JSON.
 | `H` | Highlight the selection |
 | `L` | Reference intervals |
 | `⌘\` | Show or hide the side panel |
-| `Alt`-click | Strike through an answer choice |
+| `⌥`-click | Rule a choice out (or right-click it, or use the ⊘) |
+| `⌘↵` | Save the note you are writing in the item panel |
 
 ## Layout
 

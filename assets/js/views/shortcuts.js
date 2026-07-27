@@ -24,7 +24,7 @@ const GROUPS = [
       [['H'], 'Highlight the selected passage'],
       [['L'], 'Open reference intervals'],
       [[mod, '\\'], 'Show or hide the side panel'],
-      [['Alt', 'click'], 'Strike through an answer choice'],
+      [['\u2325', 'click'], 'Rule a choice out (or right-click it, or use the \u2298)'],
     ],
   },
   {

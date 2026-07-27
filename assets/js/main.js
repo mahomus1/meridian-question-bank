@@ -50,6 +50,7 @@ function paintRail() {
   const map = {
     '': 'dashboard', create: 'create', browse: 'browse', notebook: 'notebook',
     performance: 'performance', tests: 'tests', settings: 'settings',
+    highlights: 'highlights',
     test: 'tests', results: 'tests',
   };
   const activeKey = map[seg] ?? '';
@@ -61,8 +62,11 @@ function paintRail() {
 
   const notes = store.state.notes.length;
   const tests = store.state.tests.length;
+  const hls = store.highlightCount();
   $('[data-count="notes"]').textContent = notes ? num(notes) : '';
   $('[data-count="tests"]').textContent = tests ? num(tests) : '';
+  const hlEl = $('[data-count="highlights"]');
+  if (hlEl) hlEl.textContent = hls ? num(hls) : '';
 
   const o = store.overall();
   const total = bank.index?.meta.total || 0;
@@ -77,7 +81,7 @@ function paintRail() {
 }
 
 store.on('*', (topic) => {
-  if (['notes', 'tests', 'answers', 'reset', 'notebooks'].includes(topic)) paintRail();
+  if (['notes', 'tests', 'answers', 'reset', 'notebooks', 'highlights', 'capture'].includes(topic)) paintRail();
 });
 
 store.on('quota', () => {
@@ -95,6 +99,7 @@ route('/browse/:id', lazy('./views/browse.js'));
 route('/test/:id', lazy('./views/runner.js'));
 route('/results/:id', lazy('./views/results.js'));
 route('/tests', lazy('./views/tests.js'));
+route('/highlights', lazy('./views/highlights.js'));
 route('/notebook', lazy('./views/notebook.js'));
 route('/notebook/:noteId', lazy('./views/notebook.js'));
 route('/performance', lazy('./views/performance.js'));
@@ -157,6 +162,7 @@ function openPalette() {
     { label: 'Create test', hint: 'Page', go: '/create' },
     { label: 'Question bank', hint: 'Page', go: '/browse' },
     { label: 'Notebook', hint: 'Page', go: '/notebook' },
+    { label: 'Highlights', hint: 'Page', go: '/highlights' },
     { label: 'Performance', hint: 'Page', go: '/performance' },
     { label: 'Test history', hint: 'Page', go: '/tests' },
     { label: 'Settings', hint: 'Page', go: '/settings' },
