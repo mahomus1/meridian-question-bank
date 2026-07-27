@@ -64,8 +64,13 @@ export function modal({ title, desc, body, actions, wide = false, onOpen }) {
   document.addEventListener('keydown', onEsc, true);
   const untrap = trap(box, close);
 
-  const first = box.querySelector('input, textarea, button.btn--primary, button');
-  first?.focus();
+  // Focus a field if the dialog has one. Focusing a footer button instead would
+  // scroll a tall dialog straight past its own heading.
+  const field = box.querySelector('input, textarea');
+  if (field) field.focus();
+  else { box.tabIndex = -1; box.focus({ preventScroll: true }); }
+  box.scrollTop = 0;
+
   onOpen?.(box, close);
   return close;
 }

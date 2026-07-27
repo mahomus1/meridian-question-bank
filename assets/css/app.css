@@ -618,6 +618,8 @@ h1, h2, h3, h4 { font-weight: 600; line-height: 1.25; }
   display: grid; place-items: center; gap: 10px;
   padding: 56px 24px; text-align: center;
 }
+/* Inside a panel the surrounding chrome already gives the state room. */
+.panel__body > .empty, .panel > .empty { padding: 30px 20px; }
 .empty__mark {
   width: 40px; height: 40px; border-radius: 10px;
   background: var(--surface-2); border: 1px solid var(--rule);
