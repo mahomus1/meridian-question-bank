@@ -631,10 +631,13 @@ body.resizing-panel { cursor: col-resize; user-select: none; }
 
 /* Clipped prose is ordinary text. Its only trace is a mark in the margin,
    which the reader can switch off entirely. */
-.doc[data-sources="on"] p[data-qid] { position: relative; }
+/* The mark sits inside a gutter of the paragraph's own box, so it can be
+   clicked — and so the click test has a region to test against that is not
+   the text itself. */
+.doc[data-sources="on"] p[data-qid] { position: relative; padding-right: 20px; }
 .doc[data-sources="on"] p[data-qid]::after {
   content: "";
-  position: absolute; top: .6em; right: -14px;
+  position: absolute; top: .6em; right: 5px;
   width: 5px; height: 5px; border-radius: 50%;
   background: var(--rule-2);
   transition: background var(--t), transform var(--t);
@@ -861,3 +864,18 @@ body.dragging-block { cursor: grabbing; user-select: none; }
   font-family: var(--mono); font-size: 13.5px; background: var(--surface-2);
   padding: 10px 12px; border-radius: var(--r); white-space: pre-wrap;
 }
+
+/* choice cards in the export dialog */
+.pick-card {
+  display: grid; gap: 3px; width: 100%; padding: 11px 13px; text-align: left;
+  border: 1px solid var(--rule-2); border-radius: var(--r);
+  background: var(--surface);
+  transition: border-color var(--t), background var(--t);
+}
+.pick-card:hover { border-color: var(--ink-4); }
+.pick-card[aria-pressed="true"] {
+  border-color: var(--blue); background: var(--blue-tint);
+  box-shadow: inset 0 0 0 1px var(--blue);
+}
+.pick-card b { font-size: 13.5px; font-weight: 620; }
+.pick-card span { font-size: 12px; color: var(--ink-3); line-height: 1.45; }

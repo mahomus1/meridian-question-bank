@@ -66,4 +66,3 @@ export function start(handler) {
   render();
 }
 
-export const currentView = () => current;

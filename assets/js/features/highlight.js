@@ -286,10 +286,3 @@ export function highlightSelection(colorId = 'yellow') {
   active.onChange?.();
   return true;
 }
-
-/** The text currently selected inside the attached root, if any. */
-export function selectedText() {
-  if (!active) return null;
-  const sel = readSelection(active.root);
-  return sel ? { ...sel, source: sourceLabel(sel.blockId, active.root) } : null;
-}

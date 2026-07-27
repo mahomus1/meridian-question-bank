@@ -59,13 +59,6 @@ export function greeting() {
   return 'Good evening';
 }
 
-/** "62% of readers answered this correctly" → short peer phrase. */
-export const peerPhrase = (p) => `${p}% answered correctly`;
-
-export function slugify(s) {
-  return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-}
-
 /** Filename-safe stamp for exports. */
 export function stamp() {
   const d = new Date();

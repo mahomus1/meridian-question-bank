@@ -122,4 +122,3 @@ export function prompt({ title, desc, label, value = '', placeholder = '', ok = 
   });
 }
 
-export const closeModal = () => closeCurrent?.();

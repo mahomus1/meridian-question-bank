@@ -255,9 +255,53 @@ addEventListener('keydown', (ev) => {
   }
 });
 
+/* ── keeping up to date ───────────────────────────────────────────────── */
+
+/* A page already open holds its modules until it reloads, and Pages serves the
+   scripts with a ten-minute cache. Between them, a deploy could go unnoticed
+   and the reader would keep using the previous build. The entry module's ETag
+   is compared against the one last seen; when it moves, the asset cache is
+   refreshed and the page loads once more. */
+const BUILD_KEY = 'meridian.build';
+const ASSETS = [
+  'assets/css/app.css', 'assets/css/views.css',
+  'assets/js/main.js',
+  'assets/js/core/dom.js', 'assets/js/core/store.js', 'assets/js/core/bank.js',
+  'assets/js/core/router.js', 'assets/js/core/fmt.js',
+  'assets/js/render/figure.js', 'assets/js/render/table.js',
+  'assets/js/render/prose.js', 'assets/js/render/item.js',
+  'assets/js/features/overlay.js', 'assets/js/features/capture.js',
+  'assets/js/features/highlight.js', 'assets/js/features/notepanel.js',
+  'assets/js/features/blockdrag.js', 'assets/js/features/docx.js',
+  'assets/js/features/zip.js',
+  'assets/js/views/dashboard.js', 'assets/js/views/create.js',
+  'assets/js/views/runner.js', 'assets/js/views/results.js',
+  'assets/js/views/browse.js', 'assets/js/views/notebook.js',
+  'assets/js/views/highlights.js', 'assets/js/views/performance.js',
+  'assets/js/views/tests.js', 'assets/js/views/settings.js',
+  'assets/js/views/parts.js', 'assets/js/views/shortcuts.js',
+];
+
+async function refreshIfStale() {
+  let tag;
+  try {
+    const res = await fetch('assets/js/main.js', { method: 'HEAD', cache: 'no-store' });
+    tag = res.headers.get('etag') || res.headers.get('last-modified');
+  } catch { return; }            // offline: carry on with what is loaded
+  if (!tag) return;
+
+  const seen = localStorage.getItem(BUILD_KEY);
+  localStorage.setItem(BUILD_KEY, tag);
+  if (!seen || seen === tag) return;
+
+  await Promise.all(ASSETS.map((p) => fetch(p, { cache: 'reload' }).catch(() => {})));
+  location.reload();
+}
+
 /* ── boot ─────────────────────────────────────────────────────────────── */
 
 async function boot() {
+  refreshIfStale();
   applyTheme();
   applyFontScale();
   store.ensureNotebook();

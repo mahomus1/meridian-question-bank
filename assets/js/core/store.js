@@ -14,7 +14,6 @@ const BLANK = () => ({
       theme: 'auto',
       timerSecs: 90,
       showPeer: true,
-      showRail: true,
       confirmSubmit: false,
       fontScale: 1,
       panelOpen: false,
@@ -124,6 +123,16 @@ export function toggleMark(qid) {
   return !!state.marks[qid];
 }
 export const isMarked = (qid) => !!state.marks[qid];
+
+/** Clear everything and start over: answers, tests, notes, and settings. */
+export function eraseAll() {
+  const blank = BLANK();
+  for (const k of Object.keys(state)) delete state[k];
+  Object.assign(state, blank);
+  try { localStorage.removeItem(KEY); } catch { /* nothing to remove */ }
+  flush();
+  emit('reset');
+}
 
 export function resetProgress() {
   state.answers = {};
@@ -293,8 +302,8 @@ export function deleteNote(id) {
 const attr = (s) => String(s || '')
   .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 
-/** One-line description of a clipping, shown when its block cannot be drawn. */
-export function clipSummary(c) {
+/** One-line description of a clipping, used when a block cannot be drawn. */
+function clipSummary(c) {
   if (c.kind === 'text') return `“${(c.text || '').slice(0, 60)}”`;
   if (c.kind === 'figure') return `Figure — ${c.spec?.title || ''}`;
   if (c.kind === 'table') return `Table — ${c.spec?.title || ''}`;
@@ -351,20 +360,6 @@ export function removeClip(noteId, clipId) {
   changed('notes', noteId);
 }
 
-/** Append typed prose to a note's document. */
-export function appendParagraph(noteId, text) {
-  const n = noteById(noteId);
-  if (!n) return null;
-  const p = String(text).split(/\n{2,}/)
-    .map((block) => `<p>${attr(block).replace(/\n/g, '<br>')}</p>`).join('');
-  n.html = `${n.html || ''}${p}`;
-  n.updated = Date.now();
-  changed('notes', noteId);
-  return n;
-}
-
-export const notesFor = (qid) => state.notes.filter((n) => n.qid === qid
-  || n.clips.some((c) => c.qid === qid));
 
 /* ── highlights ───────────────────────────────────────────────────────── */
 

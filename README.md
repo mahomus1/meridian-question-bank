@@ -60,7 +60,9 @@ Markdown shorthand converts as you type — `## ` makes a heading, `- ` a bullet
 `1. ` a numbered list, `> ` a quote. The first line of a note is its title, so
 there is no separate field for it and nothing is ever called "Untitled".
 
-**Export to Word.** A note or the whole notebook exports as a genuine `.docx` —
+**Export to Word.** Choose how question references appear — a numbered list
+under "Sources" at the end, a line beneath each passage, or nothing at all. A
+note or the whole notebook exports as a genuine `.docx` —
 an Office Open XML package built and zipped in the browser, not an HTML file
 wearing the extension. Headings, lists, quotes, colour, and every run-level mark
 become real Word constructs; clipped tables become real Word tables; and figures

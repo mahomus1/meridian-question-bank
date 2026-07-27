@@ -65,9 +65,6 @@ export function repaint(root, blockId, text, ranges) {
   el.replaceChildren(paint(text, ranges.filter((r) => r.b === blockId)));
 }
 
-/** Plain text of a block, used when resolving a selection to offsets. */
-export const textOf = (el) => el.textContent;
-
 /* ── lightweight markdown for notebook bodies ─────────────────────────── */
 
 const inline = (s) => s

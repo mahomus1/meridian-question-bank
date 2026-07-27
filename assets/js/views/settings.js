@@ -57,14 +57,6 @@ export default async function settings() {
         }),
         h('span.switch__track'))),
 
-    row('Side panel in tests', 'Keep the highlights and notes panel open while working through a test.',
-      h('label.switch',
-        h('input', {
-          type: 'checkbox', checked: p.showRail !== false,
-          onchange: (ev) => store.setPref('showRail', ev.target.checked),
-        }),
-        h('span.switch__track'))),
-
     row('Default time per question', 'Used when you turn on timing in the test builder.',
       h('div.seg',
         [60, 75, 90, 120].map((s) => h('button', {
@@ -121,6 +113,21 @@ export default async function settings() {
             }
           },
         }))),
+
+    row('Start fresh', 'Erases everything — answers, tests, highlights, notes, notebooks, and settings. Useful after trying the app out.',
+      h('button.btn.btn--danger', {
+        onclick: async () => {
+          const ok = await confirm({
+            title: 'Erase everything?',
+            desc: 'Every answer, test, highlight, note, and preference is removed and the app returns to how it first opened. Export a backup first if you want to keep any of it.',
+            ok: 'Erase everything', danger: true,
+          });
+          if (!ok) return;
+          store.eraseAll();
+          location.hash = '#/';
+          location.reload();
+        },
+      }, 'Erase')),
 
     row('Reset progress', 'Clears answers, marks, and tests. Your notebook and highlights are kept.',
       h('button.btn.btn--danger', {

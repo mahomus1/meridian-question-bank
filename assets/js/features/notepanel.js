@@ -423,11 +423,22 @@ function syncToolbar() {
 
 /* ── source marks ─────────────────────────────────────────────────────── */
 
+/* The mark lives in the paragraph's right-hand gutter. Only a plain click
+   landing in that gutter opens the question — a drag that happens to finish
+   near the edge is a text selection, not a request to navigate away. */
 function onDocClick(ev) {
   const p = ev.target.closest?.('[data-qid]');
   if (!p || !docEl.contains(p)) return;
+  if (docEl.dataset.sources === 'off') return;
+
+  const sel = getSelection();
+  if (sel && !sel.isCollapsed) return;
+
+  const gutter = parseFloat(getComputedStyle(p).paddingRight) || 0;
+  if (!gutter) return;
   const r = p.getBoundingClientRect();
-  if (ev.clientX < r.right - 4) return;
+  if (ev.clientX < r.right - gutter) return;
+
   ev.preventDefault();
   go(`/browse/${p.dataset.qid}`);
 }
@@ -445,6 +456,25 @@ function onKey(ev) {
   }
 
   if (ev.key === 'Escape') { docEl.blur(); return; }
+
+  /* Splitting a paragraph copies its attributes onto the new one, so words
+     typed after a clipped passage would inherit its attribution and be
+     credited to a question the reader never quoted. A paragraph that comes
+     out of the split empty is the reader's own, and loses the source. */
+  if (ev.key === 'Enter') {
+    const from = blockOf(getSelection().anchorNode);
+    if (from?.dataset.src || from?.dataset.qid) {
+      setTimeout(() => {
+        const made = blockOf(getSelection().anchorNode);
+        if (made && made !== from && !made.textContent.trim()) {
+          delete made.dataset.src;
+          delete made.dataset.qid;
+          queue(() => ({ html: serialise() }));
+        }
+      }, 0);
+    }
+    return;
+  }
 
   if (ev.key !== 'Backspace') return;
   const sel = getSelection();
@@ -548,27 +578,66 @@ function moreMenu() {
 
 /* ── export ───────────────────────────────────────────────────────────── */
 
-export async function exportNote(note) {
-  try {
-    const blob = await buildDocx([note], { sources: store.prefs().showSources !== false });
-    download(blob, `${fileName(noteTitle(note))}.docx`);
-    toast('Exported as Word document');
-  } catch (err) {
-    console.error(err);
-    toast('That note could not be exported.');
-  }
+const REF_MODES = [
+  ['list', 'A numbered list at the end',
+    'Each quoted passage gets a small superscript number, and the questions are listed once under “Sources”.'],
+  ['inline', 'A line under each passage',
+    'The question is named beneath the passage it came from, and repeated sources are named once.'],
+  ['none', 'Leave them out',
+    'Nothing marks where a passage came from.'],
+];
+
+/** Ask how references should appear, then write the file. */
+function exportWith(notes, filename) {
+  if (!notes.length) { toast('Nothing to export'); return; }
+  let mode = store.prefs().exportRefs || 'list';
+
+  const options = h('div.stack-6', REF_MODES.map(([id, name, desc]) => h('button.pick-card', {
+    type: 'button',
+    'aria-pressed': String(mode === id),
+    onclick: (ev) => {
+      mode = id;
+      ev.currentTarget.parentElement.querySelectorAll('.pick-card')
+        .forEach((c) => c.setAttribute('aria-pressed', 'false'));
+      ev.currentTarget.setAttribute('aria-pressed', 'true');
+    },
+  }, h('b', name), h('span', desc))));
+
+  modal({
+    title: 'Export to Word',
+    desc: `${notes.length === 1 ? 'This note' : `${notes.length} notes`} as a .docx file.`,
+    body: h('div.stack-12', h('span.label', 'Question references'), options),
+    actions: (close) => [
+      h('button.btn', { onclick: close }, 'Cancel'),
+      h('button.btn.btn--primary', {
+        onclick: async (ev) => {
+          const btn = ev.currentTarget;
+          btn.disabled = true;
+          btn.textContent = 'Building…';
+          store.setPref('exportRefs', mode);
+          try {
+            const blob = await buildDocx(notes, { refs: mode });
+            download(blob, `${filename}.docx`);
+            close();
+            toast(notes.length === 1 ? 'Exported as Word' : `${notes.length} notes exported`);
+          } catch (err) {
+            console.error(err);
+            btn.disabled = false;
+            btn.textContent = 'Export';
+            toast('That could not be exported.');
+          }
+        },
+      }, 'Export'),
+    ],
+  });
 }
 
-export async function exportNotes(notes, name) {
-  if (!notes.length) { toast('Nothing to export'); return; }
-  try {
-    const blob = await buildDocx(notes, { sources: store.prefs().showSources !== false });
-    download(blob, `${name}.docx`);
-    toast(`${notes.length} notes exported as Word`);
-  } catch (err) {
-    console.error(err);
-    toast('The notebook could not be exported.');
-  }
+export function exportNote(note) {
+  exportWith([note], fileName(noteTitle(note)));
+}
+
+export function exportNotes(notes, name) {
+  exportWith(notes, name);
 }
 
 const fileName = (s2) => (s2 || 'note').replace(/[^\w\s-]+/g, '').trim()

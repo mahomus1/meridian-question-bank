@@ -2,6 +2,3 @@
 node_modules/
 *.log
 
-# Truncated artifact of an interrupted earlier attempt at this project.
-# Superseded by tools/generate.mjs; kept locally, not published.
-scripts/

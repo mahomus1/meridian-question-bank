@@ -121,7 +121,6 @@ export function filterItems(f = {}) {
   });
 }
 
-export const countItems = (f) => filterItems(f).length;
 
 /** Deterministic shuffle when the reader asks for a shuffled test. */
 export function pickQuestions(items, n, shuffle = true) {
@@ -136,4 +135,3 @@ export function pickQuestions(items, n, shuffle = true) {
 }
 
 export const bandLabel = (id) => bank.index.meta.bands.find((b) => b.id === id)?.label || id;
-export const bandIndex = (id) => bank.index.meta.bands.findIndex((b) => b.id === id);
