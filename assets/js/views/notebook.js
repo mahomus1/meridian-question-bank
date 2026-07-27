@@ -317,6 +317,8 @@ export default async function notebook({ noteId }) {
 
     hydrate(doc, nt);
     markEmpty(doc);
+    // Ask the browser for <p> rather than <div> when a new block is made.
+    try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch { /* not supported */ }
   }
 
   /** Flags a blank document so its placeholder shows. */
@@ -382,7 +384,15 @@ export default async function notebook({ noteId }) {
       el.replaceChildren();
       el.removeAttribute('style');
     });
-    return copy.innerHTML;
+    // The editor can nest a list inside a paragraph, which is invalid and only
+    // survives because re-parsing hoists it. Normalise before storing so what
+    // is written to disk is the same shape that comes back.
+    const norm = document.createElement('div');
+    norm.innerHTML = copy.innerHTML;
+    norm.querySelectorAll('p:empty').forEach((p, i, all) => {
+      if (i < all.length - 1) p.remove();          // keep one place to type
+    });
+    return norm.innerHTML;
   }
 
   /** Draw every clip block that is currently in the document. */

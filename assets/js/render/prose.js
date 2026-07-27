@@ -192,9 +192,11 @@ export function htmlToMarkdown(html, clipMd = () => '') {
     return s;
   };
 
-  for (const el of box.children) {
+  // contenteditable wraps new blocks in <div> in some browsers, so unknown
+  // wrappers are walked through rather than flattened into a paragraph.
+  const emit = (el) => {
     const tag = el.tagName.toLowerCase();
-    if (el.classList.contains('doc-clip')) { out.push(clipMd(el.dataset.clip), ''); continue; }
+    if (el.classList.contains('doc-clip')) { out.push(clipMd(el.dataset.clip), ''); return; }
     if (tag === 'h1' || tag === 'h2' || tag === 'h3') {
       out.push(`${'#'.repeat(Number(tag[1]))} ${inlineMd(el)}`, '');
     } else if (tag === 'ul' || tag === 'ol') {
@@ -207,10 +209,14 @@ export function htmlToMarkdown(html, clipMd = () => '') {
       out.push('');
     } else if (tag === 'hr') {
       out.push('---', '');
+    } else if ((tag === 'div' || tag === 'p') && el.querySelector('ul, ol, blockquote, h1, h2, h3')) {
+      [...el.children].forEach(emit);
     } else {
       const t = inlineMd(el).trim();
       if (t) out.push(t, '');
     }
-  }
+  };
+
+  [...box.children].forEach(emit);
   return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
