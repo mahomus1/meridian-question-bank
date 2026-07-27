@@ -51,8 +51,10 @@ There is no edit/preview mode: formatting appears as you apply it. A clipped
 passage arrives as **ordinary editable prose** you can trim, rephrase, split, or
 fold into your own sentence, keeping its source on a quiet line beneath that
 survives the rewriting. Figures and tables, which cannot be edited as words,
-sit inline as objects you can place and remove. Export writes the whole document
-back out as Markdown.
+sit inline as objects you can place and remove. Every block — heading, list,
+quotation, figure, table — has a drag handle in the left margin, so anything can
+be moved anywhere in the page. Export writes the whole document back out as
+Markdown.
 
 **One visible destination.** Clippings go to the note you have pinned, shown at
 all times in the item panel as *Saving to → …*. Click it to switch note, switch

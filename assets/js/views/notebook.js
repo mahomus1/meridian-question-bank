@@ -14,6 +14,7 @@ import { figureSvg } from '../render/figure.js';
 import { tableBlock } from '../render/table.js';
 import { toast, confirm, prompt, modal } from '../features/overlay.js';
 import { chooseTarget } from '../features/capture.js';
+import { enableBlockDrag } from '../features/blockdrag.js';
 import { empty } from './parts.js';
 
 export default async function notebook({ noteId }) {
@@ -216,6 +217,7 @@ export default async function notebook({ noteId }) {
   /* ── editor ─────────────────────────────────────────────────────────── */
 
   let saveTimer = null;
+  let detachDrag = null;
   const queueSave = (patch) => {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
@@ -311,12 +313,19 @@ export default async function notebook({ noteId }) {
           titleEl,
           tagRow(nt),
           docToolbar(doc),
-          doc,
+          h('div.doc-wrap', doc),
           h('p.xs.muted', { style: { marginTop: '24px' } },
             `${book ? book.name : 'General'} · created ${ago(nt.created)} · updated ${ago(nt.updated)}`))));
 
     hydrate(doc, nt);
     markEmpty(doc);
+
+    detachDrag?.();
+    detachDrag = enableBlockDrag(editHost.querySelector('.doc-wrap'), doc, () => {
+      clearTimeout(saveTimer);
+      store.updateNote(nt.id, { html: serialise(doc) });
+      markEmpty(doc);
+    });
     // Ask the browser for <p> rather than <div> when a new block is made.
     try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch { /* not supported */ }
   }
@@ -684,6 +693,7 @@ export default async function notebook({ noteId }) {
     fixed: true,
     destroy() {
       clearTimeout(saveTimer);
+      detachDrag?.();
       if (current) {
         const t = editHost.querySelector('.nb-title');
         const b = editHost.querySelector('.nb-body');
