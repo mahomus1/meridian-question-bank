@@ -43,10 +43,16 @@ image. The **Highlights** page collects every passage you have marked across the
 bank, filterable by colour and category, each one a click from its item.
 
 **A notebook you organise.** Notebooks are folders you create, name, colour, and
-delete; notes live in one notebook and carry any number of tags. Markdown with a
-formatting toolbar and a preview mode. Clippings render inline with a link back
-to the question they came from. Export a single note or the whole notebook as
-Markdown.
+delete; notes live in one notebook and carry any number of tags.
+
+**A note is one document.** Not a text box with a pile of attachments below it —
+a single page you type into, where clippings land in the flow of your writing.
+There is no edit/preview mode: formatting appears as you apply it. A clipped
+passage arrives as **ordinary editable prose** you can trim, rephrase, split, or
+fold into your own sentence, keeping its source on a quiet line beneath that
+survives the rewriting. Figures and tables, which cannot be edited as words,
+sit inline as objects you can place and remove. Export writes the whole document
+back out as Markdown.
 
 **One visible destination.** Clippings go to the note you have pinned, shown at
 all times in the item panel as *Saving to → …*. Click it to switch note, switch

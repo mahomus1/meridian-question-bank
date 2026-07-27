@@ -238,6 +238,7 @@ export function createNote(patch = {}) {
     book,
     title: patch.title || '',
     body: patch.body || '',
+    html: patch.html || '',
     tags: patch.tags || [],
     qid: patch.qid || null,
     clips: patch.clips || [],
@@ -286,21 +287,79 @@ export function deleteNote(id) {
   changed('notes', id);
 }
 
+const attr = (s) => String(s || '')
+  .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+
+/** One-line description of a clipping, shown when its block cannot be drawn. */
+export function clipSummary(c) {
+  if (c.kind === 'text') return `“${(c.text || '').slice(0, 60)}”`;
+  if (c.kind === 'figure') return `Figure — ${c.spec?.title || ''}`;
+  if (c.kind === 'table') return `Table — ${c.spec?.title || ''}`;
+  return `Question — ${c.source || c.qid || ''}`;
+}
+
+const escText = (s) => String(s || '')
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+/**
+ * Add a clipping to a note's document.
+ *
+ * Prose arrives as ordinary editable text — a quotation the reader can trim,
+ * rephrase, split, or fold into their own sentence — carrying its source as an
+ * attribute so the attribution survives editing without being editable itself.
+ * Only figures and tables, which cannot be edited as words, stay as placed
+ * objects backed by a stored spec.
+ */
 export function addClip(noteId, clip) {
   const n = noteById(noteId);
   if (!n) return null;
-  n.clips.push({ id: uid('c'), at: Date.now(), ...clip });
+
+  if (clip.kind === 'text' || clip.kind === 'question') {
+    const src = [clip.source, clip.qid].filter(Boolean).join(' · ');
+    n.html = `${n.html || ''}<blockquote class="doc-quote"`
+      + ` data-src="${attr(src)}"`
+      + (clip.color ? ` data-hl="${attr(clip.color)}"` : '')
+      + `><p>${escText(clip.text)}</p></blockquote><p><br></p>`;
+    n.updated = Date.now();
+    changed('notes', noteId);
+    return null;
+  }
+
+  const rec = { id: uid('c'), at: Date.now(), ...clip };
+  n.clips.push(rec);
+  n.html = `${n.html || ''}<div class="doc-clip" contenteditable="false"`
+    + ` data-clip="${rec.id}" data-kind="${attr(rec.kind)}"`
+    + ` data-summary="${attr(clipSummary(rec))}"></div><p><br></p>`;
   n.updated = Date.now();
   changed('notes', noteId);
-  return n;
+  return rec;
 }
 
 export function removeClip(noteId, clipId) {
   const n = noteById(noteId);
   if (!n) return;
   n.clips = n.clips.filter((c) => c.id !== clipId);
+  // Drop its block from the document too, or an empty placeholder is left.
+  if (n.html) {
+    const box = document.createElement('div');
+    box.innerHTML = n.html;
+    box.querySelector(`.doc-clip[data-clip="${CSS.escape(clipId)}"]`)?.remove();
+    n.html = box.innerHTML;
+  }
   n.updated = Date.now();
   changed('notes', noteId);
+}
+
+/** Append typed prose to a note's document. */
+export function appendParagraph(noteId, text) {
+  const n = noteById(noteId);
+  if (!n) return null;
+  const p = String(text).split(/\n{2,}/)
+    .map((block) => `<p>${attr(block).replace(/\n/g, '<br>')}</p>`).join('');
+  n.html = `${n.html || ''}${p}`;
+  n.updated = Date.now();
+  changed('notes', noteId);
+  return n;
 }
 
 export const notesFor = (qid) => state.notes.filter((n) => n.qid === qid

@@ -82,22 +82,22 @@ export function clipQuestion({ qid, noteId }) {
   if (!note) return null;
   const m = meta(qid);
   store.addClip(note.id, {
-    kind: 'question', qid, source: m ? `${m.topic} — ${m.archetypeLabel}` : qid,
+    kind: 'question', qid,
+    text: m ? `${m.topic} — ${m.ask}` : qid,
+    source: m ? m.archetypeLabel : '',
   });
   saved(note, 'Question');
   return note;
 }
 
-/** Append typed text to the destination without leaving the item. */
+/** Append typed prose to the destination without leaving the item. */
 export function writeNote({ qid, text }) {
   const body = text.trim();
   if (!body) return null;
   const note = targetNote(qid);
-  const stamp = meta(qid) ? `${meta(qid).topic} · ${qid}` : qid;
-  note.body = note.body
-    ? `${note.body}\n\n${body}\n\n> from ${stamp}`
-    : `${body}\n\n> from ${stamp}`;
-  store.updateNote(note.id, { body: note.body });
+  const m = meta(qid);
+  store.appendParagraph(note.id, body);
+  store.appendParagraph(note.id, `— ${m ? `${m.topic} · ${qid}` : qid}`);
   toast(`Saved to ${note.title || 'Untitled note'}`, {
     action: 'Open', onAction: () => go(`/notebook/${note.id}`),
   });

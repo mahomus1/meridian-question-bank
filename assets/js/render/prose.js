@@ -78,7 +78,11 @@ const inline = (s) => s
   .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
     '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
 
-/** Renders a practical subset: headings, lists, quotes, rules, emphasis. */
+/**
+ * Renders a practical subset: headings, lists, quotes, rules, tables, and
+ * emphasis. Used to migrate legacy markdown notes into the document editor and
+ * to render any markdown a reader pastes in.
+ */
 export function markdown(src) {
   const lines = String(src || '').split('\n');
   const out = [];
@@ -90,9 +94,27 @@ export function markdown(src) {
   };
   const closeList = () => { if (list) { out.push(`</${list}>`); list = null; } };
 
-  for (const raw of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i];
     const ln = raw.trimEnd();
     if (!ln.trim()) { closePara(); closeList(); continue; }
+
+    // Pipe table: a header row, a separator, then body rows.
+    if (ln.trim().startsWith('|') && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1] || '')) {
+      closePara(); closeList();
+      const cells = (row) => row.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+      const head = cells(ln);
+      i += 2;
+      const body = [];
+      while (i < lines.length && lines[i].trim().startsWith('|')) { body.push(cells(lines[i])); i++; }
+      i--;
+      out.push('<div class="md-table"><table><thead><tr>'
+        + head.map((c) => `<th>${inline(c)}</th>`).join('')
+        + '</tr></thead><tbody>'
+        + body.map((r) => `<tr>${r.map((c) => `<td>${inline(c)}</td>`).join('')}</tr>`).join('')
+        + '</tbody></table></div>');
+      continue;
+    }
 
     const head = /^(#{1,3})\s+(.*)$/.exec(ln);
     if (head) {
@@ -133,4 +155,62 @@ export function excerpt(src, max = 140) {
   const flat = String(src || '')
     .replace(/[#>*`_]/g, '').replace(/\s+/g, ' ').trim();
   return flat.length > max ? `${flat.slice(0, max)}…` : flat;
+}
+
+/** Plain text of a document, for previews and search. */
+export function htmlToText(html) {
+  const box = document.createElement('div');
+  box.innerHTML = String(html || '');
+  box.querySelectorAll('.doc-clip').forEach((el) => {
+    el.replaceWith(document.createTextNode(` ${el.dataset.summary || ''} `));
+  });
+  return box.textContent.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Serialise the document editor back to Markdown for export.
+ * `clipMd` turns a clip id into its markdown form.
+ */
+export function htmlToMarkdown(html, clipMd = () => '') {
+  const box = document.createElement('div');
+  box.innerHTML = String(html || '');
+  const out = [];
+
+  const inlineMd = (node) => {
+    let s = '';
+    for (const n of node.childNodes) {
+      if (n.nodeType === Node.TEXT_NODE) { s += n.nodeValue; continue; }
+      const tag = n.tagName?.toLowerCase();
+      const inner = inlineMd(n);
+      if (tag === 'b' || tag === 'strong') s += `**${inner}**`;
+      else if (tag === 'i' || tag === 'em') s += `*${inner}*`;
+      else if (tag === 'code') s += `\`${inner}\``;
+      else if (tag === 'a') s += `[${inner}](${n.getAttribute('href') || ''})`;
+      else if (tag === 'br') s += '\n';
+      else s += inner;
+    }
+    return s;
+  };
+
+  for (const el of box.children) {
+    const tag = el.tagName.toLowerCase();
+    if (el.classList.contains('doc-clip')) { out.push(clipMd(el.dataset.clip), ''); continue; }
+    if (tag === 'h1' || tag === 'h2' || tag === 'h3') {
+      out.push(`${'#'.repeat(Number(tag[1]))} ${inlineMd(el)}`, '');
+    } else if (tag === 'ul' || tag === 'ol') {
+      [...el.children].forEach((li, i) => out.push(`${tag === 'ul' ? '-' : `${i + 1}.`} ${inlineMd(li)}`));
+      out.push('');
+    } else if (tag === 'blockquote') {
+      const src = el.getAttribute('data-src');
+      out.push(`> ${inlineMd(el).trim().replace(/\n/g, '\n> ')}`);
+      if (src) out.push('>', `> — ${src}`);
+      out.push('');
+    } else if (tag === 'hr') {
+      out.push('---', '');
+    } else {
+      const t = inlineMd(el).trim();
+      if (t) out.push(t, '');
+    }
+  }
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }

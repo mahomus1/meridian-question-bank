@@ -9,7 +9,7 @@ import * as store from '../core/store.js';
 import { meta, cat } from '../core/bank.js';
 import { go } from '../core/router.js';
 import { ago, n, stamp } from '../core/fmt.js';
-import { markdown, excerpt } from '../render/prose.js';
+import { markdown, htmlToText, htmlToMarkdown, excerpt } from '../render/prose.js';
 import { figureSvg } from '../render/figure.js';
 import { tableBlock } from '../render/table.js';
 import { toast, confirm, prompt, modal } from '../features/overlay.js';
@@ -22,7 +22,6 @@ export default async function notebook({ noteId }) {
   let bookFilter = 'all';
   let search = '';
   let current = noteId ? store.noteById(noteId) : store.state.notes[0] || null;
-  let mode = 'write';
 
   const railHost = h('aside.nb__rail');
   const listHost = h('div.nb__list');
@@ -166,7 +165,7 @@ export default async function notebook({ noteId }) {
     return store.state.notes.filter((nt) => {
       if (bookFilter !== 'all' && nt.book !== bookFilter) return false;
       if (!s) return true;
-      const hay = `${nt.title} ${nt.body} ${(nt.tags || []).join(' ')} ${nt.clips.map((c) => c.text || c.source || '').join(' ')}`;
+      const hay = `${nt.title} ${htmlToText(nt.html) || nt.body} ${(nt.tags || []).join(' ')} ${nt.clips.map((c) => c.text || c.source || '').join(' ')}`;
       return hay.toLowerCase().includes(s);
     });
   }
@@ -200,7 +199,7 @@ export default async function notebook({ noteId }) {
                 ? h('span', { title: 'Clippings are collecting here', style: { color: 'var(--blue)' } }, '★ ')
                 : null,
               nt.title || 'Untitled note'),
-            h('div.nb-item__p', excerpt(nt.body) || (nt.clips.length ? `${nt.clips.length} clipping${nt.clips.length === 1 ? '' : 's'}` : 'Empty')),
+            h('div.nb-item__p', preview(nt)),
             h('div.nb-item__m',
               h('span.dot', { style: { background: store.notebookById(nt.book)?.color || 'var(--ink-4)', width: '6px', height: '6px' } }),
               h('span', ago(nt.updated)),
@@ -235,24 +234,38 @@ export default async function notebook({ noteId }) {
       return;
     }
     const nt = current;
-    const book = store.state.notebooks.find((b) => b.id === nt.book);
+    migrate(nt);
+    const book = store.notebookById(nt.book);
 
     const titleEl = h('input.nb-title', {
       type: 'text', value: nt.title, placeholder: 'Untitled note',
       oninput: () => queueSave(() => ({ title: titleEl.value })),
+      onkeydown: (ev) => {
+        // Enter in the title drops into the document, as it should.
+        if (ev.key === 'Enter') { ev.preventDefault(); focusEnd(); }
+      },
     });
-    const bodyEl = h('textarea.nb-body', {
-      value: nt.body, placeholder: 'Write here. Markdown works: **bold**, *italic*, # heading, - list.',
-      spellcheck: true,
-      oninput: () => { autoGrow(bodyEl); queueSave(() => ({ body: bodyEl.value })); },
+
+    const doc = h('div.doc', {
+      contenteditable: 'true',
+      spellcheck: 'true',
+      role: 'textbox',
+      'aria-multiline': 'true',
+      'aria-label': 'Note',
+      html: nt.html || '<p><br></p>',
+      oninput: () => { markEmpty(doc); queueSave(() => ({ html: serialise(doc) })); },
+      onkeydown: onDocKey,
+      onpaste: (ev) => {
+        // Keep the document to the shapes the editor understands.
+        ev.preventDefault();
+        const text = ev.clipboardData.getData('text/plain');
+        document.execCommand('insertText', false, text);
+      },
     });
 
     fill(editHost,
       h('div.nb-edit-head',
-        h('div.seg',
-          h('button', { 'aria-pressed': String(mode === 'write'), onclick: () => { mode = 'write'; drawEditor(); } }, 'Write'),
-          h('button', { 'aria-pressed': String(mode === 'read'), onclick: () => { mode = 'read'; drawEditor(); } }, 'Preview')),
-        h('div.push.row', { style: { gap: '6px' } },
+        h('div.push.row', { style: { gap: '6px', marginLeft: 0 } },
           h('select.select', {
             style: { width: 'auto' },
             onchange: (ev) => { store.updateNote(nt.id, { book: ev.target.value }); draw(); },
@@ -285,33 +298,210 @@ export default async function notebook({ noteId }) {
             },
           }, 'Delete'))),
 
-      h('div.nb-edit-body',
+      h('div.nb-edit-body', {
+        // Clicking the empty space under the last block puts the caret at the
+        // end, the way a page of paper behaves.
+        onmousedown: (ev) => {
+          if (ev.target === ev.currentTarget || ev.target.classList.contains('nb-edit-inner')) {
+            ev.preventDefault(); focusEnd();
+          }
+        },
+      },
         h('div.nb-edit-inner',
-          mode === 'write'
-            ? h('div.stack-16',
-              titleEl,
-              tagRow(nt),
-              toolbar(bodyEl),
-              bodyEl)
-            : h('div.stack-16',
-              h('h1.h1', nt.title || 'Untitled note'),
-              tagRow(nt, true),
-              h('div.md.prose', { html: markdown(nt.body) || '<p class="muted">Nothing written yet.</p>' })),
+          titleEl,
+          tagRow(nt),
+          docToolbar(doc),
+          doc,
+          h('p.xs.muted', { style: { marginTop: '24px' } },
+            `${book ? book.name : 'General'} · created ${ago(nt.created)} · updated ${ago(nt.updated)}`))));
 
-          nt.clips.length
-            ? h('div.stack-12',
-              h('div.label', `Clippings · ${nt.clips.length}`),
-              nt.clips.map((c) => clipCard(nt, c)))
-            : null,
-
-          h('p.xs.muted', `${book ? book.name : 'General'} · created ${ago(nt.created)} · updated ${ago(nt.updated)}`))));
-
-    if (mode === 'write') requestAnimationFrame(() => autoGrow(bodyEl));
+    hydrate(doc, nt);
+    markEmpty(doc);
   }
 
-  function autoGrow(ta) {
-    ta.style.height = 'auto';
-    ta.style.height = `${Math.max(220, ta.scrollHeight)}px`;
+  /** Flags a blank document so its placeholder shows. */
+  function markEmpty(doc) {
+    const blank = !doc.querySelector('.doc-clip') && !doc.textContent.trim();
+    doc.dataset.empty = blank ? '1' : '';
+  }
+
+  /* ── document plumbing ──────────────────────────────────────────────── */
+
+  const attr = (s) => String(s || '')
+    .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+
+  /**
+   * Bring older notes into the document editor: markdown bodies become
+   * content, and prose clippings become editable quotations rather than the
+   * locked cards they used to be. Runs once per note.
+   */
+  function migrate(nt) {
+    const proseClips = nt.clips.filter((c) => c.kind === 'text' || c.kind === 'question');
+    if (nt.html && !proseClips.length) return;
+    if (!nt.html && !nt.body && !nt.clips.length) return;
+
+    let html = nt.html || (nt.body ? markdown(nt.body) : '');
+
+    // Replace any locked prose block already placed in the document.
+    if (nt.html && proseClips.length) {
+      const box = document.createElement('div');
+      box.innerHTML = html;
+      for (const c of proseClips) {
+        const el = box.querySelector(`.doc-clip[data-clip="${CSS.escape(c.id)}"]`);
+        if (el) el.replaceWith(quoteEl(c));
+      }
+      html = box.innerHTML;
+    } else {
+      for (const c of nt.clips) {
+        if (c.kind === 'text' || c.kind === 'question') html += quoteEl(c).outerHTML + '<p><br></p>';
+        else {
+          html += `<div class="doc-clip" contenteditable="false" data-clip="${c.id}"`
+            + ` data-kind="${c.kind}" data-summary="${attr(store.clipSummary(c))}"></div><p><br></p>`;
+        }
+      }
+    }
+
+    store.updateNote(nt.id, {
+      html: html || '<p><br></p>',
+      clips: nt.clips.filter((c) => c.kind !== 'text' && c.kind !== 'question'),
+    });
+  }
+
+  function quoteEl(c) {
+    const m = c.qid ? meta(c.qid) : null;
+    const src = [c.source, m ? m.topic : null, c.qid].filter(Boolean).join(' · ');
+    const q = h('blockquote.doc-quote', { dataset: { src, hl: c.color || null } },
+      h('p', c.text || (m ? m.ask : '')));
+    return q;
+  }
+
+  /** Strip drawn clip contents before storing, so only the reference persists. */
+  function serialise(doc) {
+    const copy = doc.cloneNode(true);
+    copy.querySelectorAll('.doc-clip').forEach((el) => {
+      el.replaceChildren();
+      el.removeAttribute('style');
+    });
+    return copy.innerHTML;
+  }
+
+  /** Draw every clip block that is currently in the document. */
+  function hydrate(doc, nt) {
+    for (const el of doc.querySelectorAll('.doc-clip')) {
+      const c = nt.clips.find((x) => x.id === el.dataset.clip);
+      if (!c) { el.remove(); continue; }
+      el.setAttribute('contenteditable', 'false');
+      // Keep the summary current so list previews and search read the clipping.
+      el.dataset.summary = store.clipSummary(c);
+      fill(el, clipBlock(nt, c));
+    }
+    // A clipping at either end would leave nowhere to put the caret, so the
+    // document always opens and closes with a line you can type on.
+    if (doc.firstElementChild?.classList.contains('doc-clip')) {
+      doc.insertBefore(h('p', h('br')), doc.firstElementChild);
+    }
+    if (!doc.lastElementChild || doc.lastElementChild.classList.contains('doc-clip')) {
+      doc.appendChild(h('p', h('br')));
+    }
+  }
+
+  function focusEnd() {
+    const doc = editHost.querySelector('.doc');
+    if (!doc) return;
+    if (!doc.lastElementChild || doc.lastElementChild.classList.contains('doc-clip')) {
+      doc.appendChild(h('p', h('br')));
+    }
+    const range = document.createRange();
+    range.selectNodeContents(doc.lastElementChild);
+    range.collapse(false);
+    const sel = getSelection();
+    sel.removeAllRanges(); sel.addRange(range);
+    doc.focus();
+  }
+
+  function onDocKey(ev) {
+    const doc = ev.currentTarget;
+    if (ev.metaKey || ev.ctrlKey) {
+      const k = ev.key.toLowerCase();
+      const cmd = { b: 'bold', i: 'italic', u: 'underline' }[k];
+      if (cmd) { ev.preventDefault(); document.execCommand(cmd); queueSave(() => ({ html: serialise(doc) })); }
+      return;
+    }
+    // Never let a caret land inside a drawn clip.
+    if (ev.key === 'Backspace') {
+      const sel = getSelection();
+      if (sel.isCollapsed && sel.anchorOffset === 0) {
+        const block = sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement;
+        const prev = block?.closest('.doc > *')?.previousElementSibling;
+        if (prev?.classList.contains('doc-clip')) {
+          ev.preventDefault();
+          const id = prev.dataset.clip;
+          prev.remove();
+          store.removeClip(current.id, id);
+          queueSave(() => ({ html: serialise(doc) }));
+        }
+      }
+    }
+  }
+
+  function exec(doc, cmd, arg) {
+    doc.focus();
+    document.execCommand(cmd, false, arg);
+    queueSave(() => ({ html: serialise(doc) }));
+  }
+
+  function docToolbar(doc) {
+    const b = (label, title, fn, cls = '') => h(`button.nb-tool${cls}`, {
+      type: 'button', title,
+      onmousedown: (ev) => ev.preventDefault(),   // keep the selection
+      onclick: fn,
+    }, label);
+    const sep = () => h('div', { style: { width: '1px', height: '16px', background: 'var(--rule)', margin: '0 4px' } });
+    return h('div.nb-toolbar',
+      b('B', 'Bold  ⌘B', () => exec(doc, 'bold')),
+      b('I', 'Italic  ⌘I', () => exec(doc, 'italic'), '.nb-tool--i'),
+      sep(),
+      b('H', 'Heading', () => exec(doc, 'formatBlock', 'h2')),
+      b('h', 'Subheading', () => exec(doc, 'formatBlock', 'h3')),
+      b('¶', 'Body text', () => exec(doc, 'formatBlock', 'p')),
+      sep(),
+      b('•', 'Bullet list', () => exec(doc, 'insertUnorderedList')),
+      b('1.', 'Numbered list', () => exec(doc, 'insertOrderedList')),
+      b('❝', 'Quote', () => exec(doc, 'formatBlock', 'blockquote')),
+      sep(),
+      b('─', 'Divider', () => exec(doc, 'insertHorizontalRule')));
+  }
+
+  /** The drawn contents of a clipping, sitting inline in the document. */
+  function clipBlock(nt, c) {
+    const m = c.qid ? meta(c.qid) : null;
+    const origin = m ? `${m.topic} · ${cat(m.cat)?.name} · ${c.qid}` : (c.qid || '');
+
+    const tools = h('div.doc-clip__tools', { contenteditable: 'false' },
+      c.qid ? h('button.btn.btn--sm', { onclick: () => go(`/browse/${c.qid}`) }, 'Open item') : null,
+      h('button.btn.btn--sm.btn--ghost', {
+        title: 'Remove this clipping',
+        onclick: () => { store.removeClip(nt.id, c.id); drawEditor(); },
+      }, '✕'));
+
+    let inner;
+    if (c.kind === 'text') {
+      inner = h('blockquote.doc-quote', { style: { '--hlc': `var(--hl-${c.color || 'yellow'})` } },
+        h('p', c.text),
+        h('cite', [c.source, origin].filter(Boolean).join(' · ')));
+    } else if (c.kind === 'figure') {
+      inner = h('figure.doc-figure',
+        figureSvg(c.spec),
+        h('figcaption', h('b', c.spec.title), c.spec.caption ? ` — ${c.spec.caption}` : ''));
+    } else if (c.kind === 'table') {
+      inner = tableBlock(c.spec);
+    } else {
+      inner = h('div.doc-qref',
+        h('b', m ? m.topic : c.qid),
+        m ? h('p', m.ask) : null,
+        h('cite', origin));
+    }
+    return [tools, inner];
   }
 
   function tagRow(nt, readOnly = false) {
@@ -396,30 +586,42 @@ export default async function notebook({ noteId }) {
     return h('div.clip', head, body);
   }
 
+  /** One-line summary of a note for the list. */
+  function preview(nt) {
+    // A note not yet opened still holds markdown; strip its syntax for the list.
+    const text = htmlToText(nt.html) || excerpt(nt.body) || '';
+    if (text) return text.length > 140 ? `${text.slice(0, 140)}…` : text;
+    return nt.clips.length
+      ? `${nt.clips.length} clipping${nt.clips.length === 1 ? '' : 's'}` : 'Empty';
+  }
+
   /* ── export ─────────────────────────────────────────────────────────── */
 
   function noteToMarkdown(nt) {
-    const book = store.state.notebooks.find((b) => b.id === nt.book);
+    const book = store.notebookById(nt.book);
     const out = [`# ${nt.title || 'Untitled note'}`, ''];
     if (nt.tags?.length) out.push(`*Tags: ${nt.tags.join(', ')}*`, '');
-    out.push(`*Notebook: ${book?.name || 'General'} · updated ${new Date(nt.updated).toLocaleString()}*`, '');
-    if (nt.body) out.push(nt.body, '');
-    if (nt.clips.length) {
-      out.push('---', '', '## Clippings', '');
-      for (const c of nt.clips) {
-        const m = c.qid ? meta(c.qid) : null;
-        const origin = m ? `${m.topic} — ${c.qid}` : (c.qid || '');
-        if (c.kind === 'text') out.push(`> ${c.text}`, '', `— ${c.source || 'Passage'}, ${origin}`, '');
-        else if (c.kind === 'figure') out.push(`**Figure — ${c.spec.title}**`, '', c.spec.caption, '', `— ${origin}`, '');
-        else if (c.kind === 'table') {
-          out.push(`**Table — ${c.spec.title}**`, '');
-          out.push(`| ${c.spec.columns.join(' | ')} |`);
-          out.push(`| ${c.spec.columns.map(() => '---').join(' | ')} |`);
-          for (const r of c.spec.rows) out.push(`| ${r.join(' | ')} |`);
-          out.push('', `— ${origin}`, '');
-        } else out.push(`**Question — ${origin}**`, '', m ? m.ask : '', '');
+    out.push(`*${book?.name || 'General'} · updated ${new Date(nt.updated).toLocaleString()}*`, '');
+
+    const clipMd = (id) => {
+      const c = nt.clips.find((x) => x.id === id);
+      if (!c) return '';
+      const m = c.qid ? meta(c.qid) : null;
+      const origin = m ? `${m.topic} — ${c.qid}` : (c.qid || '');
+      if (c.kind === 'text') return `> ${c.text}\n>\n> — ${c.source || 'Passage'}, ${origin}`;
+      if (c.kind === 'figure') return `**Figure — ${c.spec.title}**\n\n${c.spec.caption}\n\n— ${origin}`;
+      if (c.kind === 'table') {
+        const rows = [`**Table — ${c.spec.title}**`, '',
+          `| ${c.spec.columns.join(' | ')} |`,
+          `| ${c.spec.columns.map(() => '---').join(' | ')} |`];
+        for (const r of c.spec.rows) rows.push(`| ${r.join(' | ')} |`);
+        rows.push('', `— ${origin}`);
+        return rows.join('\n');
       }
-    }
+      return `**Question — ${origin}**\n\n${m ? m.ask : ''}`;
+    };
+
+    out.push(nt.html ? htmlToMarkdown(nt.html, clipMd) : (nt.body || ''));
     return out.join('\n');
   }
 

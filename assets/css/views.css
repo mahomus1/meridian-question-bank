@@ -688,13 +688,93 @@
 .nb-title:focus { outline: none; }
 .nb-title::placeholder { color: var(--ink-4); }
 
-.nb-body {
-  width: 100%; border: 0; background: none; padding: 0; resize: none;
-  font-family: var(--prose); font-size: 16px; line-height: 1.68; color: var(--ink);
-  min-height: 220px;
+/* ── the note document ──────────────────────────────────────────────── */
+
+.doc {
+  font-family: var(--prose); font-size: 16.5px; line-height: 1.68; color: var(--ink);
+  min-height: 340px; outline: none;
 }
-.nb-body:focus { outline: none; }
-.nb-body::placeholder { color: var(--ink-4); }
+.doc:focus { outline: none; }
+.doc > * { margin-bottom: 14px; }
+.doc > *:last-child { margin-bottom: 0; }
+.doc p { min-height: 1.68em; }
+.doc h1, .doc h2, .doc h3 {
+  font-family: var(--ui); letter-spacing: -.015em; margin: 22px 0 8px;
+}
+.doc h1 { font-size: 21px; font-weight: 650; }
+.doc h2 { font-size: 18px; font-weight: 640; }
+.doc h3 { font-size: 15.5px; font-weight: 640; }
+.doc ul, .doc ol { margin-left: 22px; }
+.doc ul li { list-style: disc; margin-bottom: 5px; }
+.doc ol li { list-style: decimal; margin-bottom: 5px; }
+.doc blockquote {
+  border-left: 3px solid var(--rule-2); padding-left: 15px; color: var(--ink-2);
+}
+.doc hr { border: 0; border-top: 1px solid var(--rule); margin: 24px 0; }
+.doc a { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
+.doc { position: relative; }
+.doc[data-empty="1"]::before {
+  content: "Start writing. Anything you save from a question lands here too.";
+  position: absolute; top: 0; left: 0; pointer-events: none;
+  color: var(--ink-4); font-family: var(--ui); font-size: 14px;
+}
+
+/* clippings, sitting in the flow of the document */
+.doc-clip {
+  position: relative; margin: 18px 0;
+  border-radius: var(--r-lg);
+  transition: box-shadow var(--t);
+}
+.doc-clip:hover { box-shadow: 0 0 0 1px var(--rule-2); }
+.doc-clip__tools {
+  position: absolute; top: 6px; right: 6px; z-index: 2;
+  display: flex; gap: 4px; opacity: 0;
+  transition: opacity var(--t);
+}
+.doc-clip:hover .doc-clip__tools { opacity: 1; }
+@media (hover: none) { .doc-clip__tools { opacity: 1; } }
+
+/* A clipped passage is ordinary editable prose. Its source rides along as an
+   attribute, so it survives rewriting without being editable itself. */
+.doc blockquote.doc-quote {
+  border-left: 3px solid var(--hl-yellow);
+  padding: 11px 15px; margin: 16px 0;
+  background: var(--surface-2); border-radius: 0 var(--r) var(--r) 0;
+  color: var(--ink);
+}
+.doc blockquote.doc-quote[data-hl="blue"] { border-left-color: var(--hl-blue); }
+.doc blockquote.doc-quote[data-hl="green"] { border-left-color: var(--hl-green); }
+.doc blockquote.doc-quote[data-hl="pink"] { border-left-color: var(--hl-pink); }
+.doc blockquote.doc-quote p { margin: 0; font-size: 15.5px; line-height: 1.6; }
+.doc blockquote.doc-quote[data-src]::after {
+  content: attr(data-src);
+  display: block; margin-top: 7px;
+  font-family: var(--ui); font-size: 11.5px; color: var(--ink-4);
+  user-select: none; -webkit-user-modify: read-only;
+}
+
+.doc-qref cite,
+.doc-figure figcaption {
+  display: block; margin-top: 7px;
+  font-family: var(--ui); font-style: normal;
+  font-size: 11.5px; color: var(--ink-4); line-height: 1.45;
+}
+
+.doc-figure {
+  margin: 0; padding: 12px 14px;
+  border: 1px solid var(--rule); border-radius: var(--r-lg); background: var(--surface);
+}
+.doc-figure svg { width: 100%; height: auto; }
+
+.doc-qref {
+  padding: 13px 15px; border: 1px solid var(--rule); border-radius: var(--r-lg);
+  background: var(--surface); font-family: var(--ui);
+}
+.doc-qref b { font-size: 13.5px; font-weight: 620; }
+.doc-qref p { font-size: 13px; color: var(--ink-2); margin: 4px 0 0; line-height: 1.45; }
+
+.doc-clip .xtab { margin: 0; }
+.doc-clip .md-table table, .md-table table { font-size: 13.5px; }
 
 .nb-toolbar {
   display: flex; align-items: center; gap: 2px; flex-wrap: wrap;
