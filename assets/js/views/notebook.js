@@ -8,7 +8,7 @@ import * as store from '../core/store.js';
 import { ago, n, stamp } from '../core/fmt.js';
 import { htmlToText, excerpt } from '../render/prose.js';
 import { toast, confirm, prompt, modal } from '../features/overlay.js';
-import { openNote, noteToMarkdown, noteTitle } from '../features/notepanel.js';
+import { openNote, noteTitle, exportNotes } from '../features/notepanel.js';
 import { empty } from './parts.js';
 
 export default async function notebook({ noteId }) {
@@ -86,7 +86,7 @@ export default async function notebook({ noteId }) {
               type: 'search', placeholder: 'Search notes…', value: query,
               oninput: (ev) => { query = ev.target.value; draw(); },
             })),
-          h('button.btn.btn--sm', { onclick: exportAll }, 'Export all'),
+          h('button.btn.btn--sm', { onclick: exportAll }, 'Export all as Word'),
           h('button.btn.btn--sm.btn--primary', {
             onclick: () => {
               const nt = store.createNote({ book: book === 'all' ? undefined : book });
@@ -173,16 +173,7 @@ export default async function notebook({ noteId }) {
   }
 
   function exportAll() {
-    const notes = visible();
-    if (!notes.length) { toast('Nothing to export'); return; }
-    const text = ['# Meridian notebook', '',
-      `*${notes.length} notes · ${new Date().toLocaleString()}*`, '', '---', '']
-      .concat(notes.map(noteToMarkdown)).join('\n\n');
-    const url = URL.createObjectURL(new Blob([text], { type: 'text/markdown;charset=utf-8' }));
-    const a = h('a', { href: url, download: `meridian-notebook-${stamp()}.md` });
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    toast(`${notes.length} notes exported`);
+    exportNotes(visible(), `meridian-notebook-${stamp()}`);
   }
 
   draw();

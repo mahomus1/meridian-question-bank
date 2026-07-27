@@ -15,6 +15,7 @@ import { meta, cat } from '../core/bank.js';
 import { go } from '../core/router.js';
 import { ago } from '../core/fmt.js';
 import { markdown } from '../render/prose.js';
+import { buildDocx, download } from './docx.js';
 import { figureSvg } from '../render/figure.js';
 import { tableBlock } from '../render/table.js';
 import { toast, confirm, prompt, modal } from './overlay.js';
@@ -25,7 +26,6 @@ let docEl = null;
 let saveTimer = null;
 let detachDrag = null;
 let writing = false;        // true while the panel is saving its own edits
-let fmtBar = null;
 
 const MIN_W = 300;
 const MAX_W = 760;
@@ -111,7 +111,7 @@ export function draw() {
     oninput: onInput,
     onkeydown: onKey,
     onclick: onDocClick,
-    onblur: hideFmt,
+    onblur: rememberRange,
     onpaste: (ev) => {
       ev.preventDefault();
       document.execCommand('insertText', false, ev.clipboardData.getData('text/plain'));
@@ -130,6 +130,8 @@ export function draw() {
         h('button.panel__ico', { title: 'New note', 'aria-label': 'New note', onclick: newNote }, '+'),
         h('button.panel__ico', { title: 'More', 'aria-label': 'More', onclick: moreMenu }, '···'),
         h('button.panel__ico', { title: 'Close  ⌘J', 'aria-label': 'Close notebook', onclick: () => setOpen(false) }, '✕'))),
+
+    toolbar(),
 
     h('div.panel__body',
       h('div.panel__inner', h('div.doc-wrap', docEl))),
@@ -273,70 +275,151 @@ function autoFormat() {
   }
 }
 
-/* ── formatting bar, on selection ─────────────────────────────────────── */
+/* ── the toolbar ─────────────────────────────────────────────────────── */
 
-function exec(cmd, arg) {
-  // Focusing the editor can collapse the very selection the command needs, so
-  // the range is captured first and put back before the command runs.
+/* Clicking a control moves focus out of the document, which collapses the
+   selection the command needs. The last selection inside the note is kept and
+   put back before anything runs. */
+let savedRange = null;
+
+function rememberRange() {
   const sel = getSelection();
-  const range = sel && sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
-  if (document.activeElement !== docEl) docEl.focus();
-  if (range) { sel.removeAllRanges(); sel.addRange(range); }
-
-  document.execCommand(cmd, false, arg);
-  queue(() => ({ html: serialise() }));
-  positionFmt();
+  if (sel && sel.rangeCount && docEl?.contains(sel.anchorNode)) {
+    savedRange = sel.getRangeAt(0).cloneRange();
+  }
 }
 
-function buildFmtBar() {
-  const b = (label, title, cmd, arg, cls = '') => h(`button.fmt__b${cls}`, {
+function restoreRange() {
+  if (document.activeElement !== docEl) docEl.focus();
+  if (!savedRange) return;
+  const sel = getSelection();
+  sel.removeAllRanges();
+  sel.addRange(savedRange);
+}
+
+function exec(cmd, arg, { css = false } = {}) {
+  restoreRange();
+  try { document.execCommand('styleWithCSS', false, css); } catch { /* ignore */ }
+  document.execCommand(cmd, false, arg);
+  try { document.execCommand('styleWithCSS', false, false); } catch { /* ignore */ }
+  rememberRange();
+  queue(() => ({ html: serialise() }));
+  syncToolbar();
+}
+
+const TEXT_COLORS = ['#101f33', '#14549c', '#126640', '#9e2f24', '#8a6212', '#6c7b8e'];
+const MARK_COLORS = ['#fde68a', '#bfdbfe', '#bbf7d0', '#fbcfe8', '#e9d5ff'];
+
+function swatchPop(anchor, colors, onPick, { clearLabel } = {}) {
+  const pop = h('div.tb__pop',
+    h('div.tb__swatches', colors.map((c) => h('button.tb__sw', {
+      style: { background: c }, title: c,
+      onmousedown: (ev) => ev.preventDefault(),
+      onclick: () => { onPick(c); pop.remove(); },
+    }))),
+    clearLabel && h('button.tb__clear', {
+      onmousedown: (ev) => ev.preventDefault(),
+      onclick: () => { onPick(null); pop.remove(); },
+    }, clearLabel));
+
+  const r = anchor.getBoundingClientRect();
+  pop.style.left = `${Math.max(8, Math.min(innerWidth - 190, r.left))}px`;
+  pop.style.top = `${r.bottom + 6}px`;
+  $('.overlays').appendChild(pop);
+
+  const away = (ev) => {
+    if (pop.contains(ev.target) || anchor.contains(ev.target)) return;
+    pop.remove();
+    document.removeEventListener('mousedown', away, true);
+  };
+  setTimeout(() => document.addEventListener('mousedown', away, true), 0);
+}
+
+const BLOCKS = [
+  ['p', 'Body'], ['h1', 'Title'], ['h2', 'Heading'], ['h3', 'Subheading'],
+  ['blockquote', 'Quote'], ['pre', 'Code block'],
+];
+
+let styleSelect = null;
+
+function toolbar() {
+  const b = (label, title, run, extra = '') => h(`button.tb__b${extra}`, {
     type: 'button', title,
     onmousedown: (ev) => ev.preventDefault(),
-    onclick: () => exec(cmd, arg),
+    onclick: run,
   }, label);
-  return h('div.fmt', { hidden: true },
-    b('B', 'Bold  ⌘B', 'bold'),
-    b('I', 'Italic  ⌘I', 'italic', null, '.fmt__b--i'),
-    b('U', 'Underline  ⌘U', 'underline', null, '.fmt__b--u'),
-    h('span.fmt__sep'),
-    b('H', 'Heading', 'formatBlock', 'h2'),
-    b('h', 'Subheading', 'formatBlock', 'h3'),
-    b('¶', 'Body', 'formatBlock', 'p'),
-    h('span.fmt__sep'),
-    b('•', 'Bullets', 'insertUnorderedList'),
-    b('1.', 'Numbers', 'insertOrderedList'),
-    b('❝', 'Quote', 'formatBlock', 'blockquote'));
+  const sep = () => h('span.tb__sep');
+
+  styleSelect = h('select.tb__sel', {
+    title: 'Paragraph style',
+    onmousedown: rememberRange,
+    onchange: (ev) => exec('formatBlock', ev.target.value),
+  }, BLOCKS.map(([tag, name]) => h('option', { value: tag }, name)));
+
+  return h('div.tb',
+    b('↺', 'Undo  ⌘Z', () => exec('undo')),
+    b('↻', 'Redo  ⇧⌘Z', () => exec('redo')),
+    sep(),
+    styleSelect,
+    sep(),
+    b('B', 'Bold  ⌘B', () => exec('bold'), '.tb__b--b'),
+    b('I', 'Italic  ⌘I', () => exec('italic'), '.tb__b--i'),
+    b('U', 'Underline  ⌘U', () => exec('underline'), '.tb__b--u'),
+    b('S', 'Strikethrough', () => exec('strikeThrough'), '.tb__b--s'),
+    sep(),
+    h('button.tb__b', {
+      type: 'button', title: 'Text colour',
+      onmousedown: (ev) => { ev.preventDefault(); rememberRange(); },
+      onclick: (ev) => swatchPop(ev.currentTarget, TEXT_COLORS,
+        (c) => exec('foreColor', c || '#101f33', { css: true })),
+    }, h('span.tb__ink', 'A')),
+    h('button.tb__b', {
+      type: 'button', title: 'Highlight',
+      onmousedown: (ev) => { ev.preventDefault(); rememberRange(); },
+      onclick: (ev) => swatchPop(ev.currentTarget, MARK_COLORS,
+        (c) => exec('hiliteColor', c || 'transparent', { css: true }),
+        { clearLabel: 'None' }),
+    }, h('span.tb__mark', 'A')),
+    sep(),
+    b('•', 'Bulleted list', () => exec('insertUnorderedList')),
+    b('1.', 'Numbered list', () => exec('insertOrderedList')),
+    b('⇤', 'Outdent', () => exec('outdent')),
+    b('⇥', 'Indent', () => exec('indent')),
+    sep(),
+    b('↤', 'Align left', () => exec('justifyLeft')),
+    b('↔', 'Centre', () => exec('justifyCenter')),
+    sep(),
+    b('🔗', 'Link', addLink),
+    b('⌫', 'Clear formatting', () => { exec('removeFormat'); exec('formatBlock', 'p'); }),
+  );
 }
 
-function positionFmt() {
+async function addLink() {
+  rememberRange();
   const sel = getSelection();
-  if (!sel || sel.isCollapsed || !sel.rangeCount || !docEl?.contains(sel.anchorNode)) {
-    hideFmt();
-    return;
-  }
-  if (!fmtBar) { fmtBar = buildFmtBar(); $('.overlays').appendChild(fmtBar); }
-  const rect = sel.getRangeAt(0).getBoundingClientRect();
-  if (!rect.width && !rect.height) { hideFmt(); return; }
-
-  fmtBar.hidden = false;
-  const w = fmtBar.offsetWidth, ht = fmtBar.offsetHeight;
-  const left = Math.max(8, Math.min(innerWidth - w - 8, rect.left + rect.width / 2 - w / 2));
-  let top = rect.top - ht - 8;
-  if (top < 8) top = rect.bottom + 8;
-  fmtBar.style.left = `${left}px`;
-  fmtBar.style.top = `${top}px`;
+  if (!savedRange || savedRange.collapsed) { toast('Select the text to link first.'); return; }
+  const url = await prompt({
+    title: 'Link', label: 'Address', placeholder: 'https://…', ok: 'Add link',
+  });
+  if (!url) return;
+  const href = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+  exec('createLink', href);
+  docEl.querySelectorAll('a[href]').forEach((a) => {
+    a.setAttribute('target', '_blank');
+    a.setAttribute('rel', 'noopener noreferrer');
+  });
+  queue(() => ({ html: serialise() }));
 }
 
-function hideFmt() {
-  if (fmtBar) fmtBar.hidden = true;
-}
-
-document.addEventListener('selectionchange', () => {
-  if (!docEl || !isOpen()) return;
+/** Reflect the caret's paragraph style in the dropdown. */
+function syncToolbar() {
+  if (!styleSelect || !docEl) return;
   const sel = getSelection();
-  if (sel && !sel.isCollapsed && docEl.contains(sel.anchorNode)) positionFmt();
-  else hideFmt();
-});
+  if (!sel || !docEl.contains(sel.anchorNode)) return;
+  const block = blockOf(sel.anchorNode);
+  const tag = block?.tagName.toLowerCase();
+  styleSelect.value = BLOCKS.some(([t]) => t === tag) ? tag : 'p';
+}
 
 /* ── source marks ─────────────────────────────────────────────────────── */
 
@@ -361,7 +444,7 @@ function onKey(ev) {
     return;
   }
 
-  if (ev.key === 'Escape') { hideFmt(); docEl.blur(); return; }
+  if (ev.key === 'Escape') { docEl.blur(); return; }
 
   if (ev.key !== 'Backspace') return;
   const sel = getSelection();
@@ -442,7 +525,7 @@ function moreMenu() {
           value: b.id, selected: b.id === note.book,
         }, b.name)))),
       h('button.btn.btn--block', { onclick: () => { close(); go('/notebook'); } }, 'All notes'),
-      h('button.btn.btn--block', { onclick: () => { close(); exportNote(note); } }, 'Export as Markdown')),
+      h('button.btn.btn--block', { onclick: () => { close(); exportNote(note); } }, 'Export as Word (.docx)')),
     actions: (dismiss) => [
       h('button.btn.btn--danger', {
         onclick: async () => {
@@ -465,70 +548,31 @@ function moreMenu() {
 
 /* ── export ───────────────────────────────────────────────────────────── */
 
-export function noteToMarkdown(note) {
-  const book = store.notebookById(note.book);
-  const out = [`# ${noteTitle(note)}`, '',
-    `*${book?.name || 'General'} · ${new Date(note.updated).toLocaleString()}*`, ''];
-
-  const box = document.createElement('div');
-  box.innerHTML = note.html || markdown(note.body || '');
-
-  const inline = (el) => {
-    let s = '';
-    for (const n of el.childNodes) {
-      if (n.nodeType === Node.TEXT_NODE) { s += n.nodeValue; continue; }
-      const t = n.tagName?.toLowerCase();
-      const inner = inline(n);
-      if (t === 'b' || t === 'strong') s += `**${inner}**`;
-      else if (t === 'i' || t === 'em') s += `*${inner}*`;
-      else if (t === 'br') s += '\n';
-      else s += inner;
-    }
-    return s;
-  };
-
-  const emit = (el) => {
-    const tag = el.tagName.toLowerCase();
-    if (el.classList.contains('doc-obj')) {
-      const c = note.clips.find((x) => x.id === el.dataset.clip);
-      if (c?.kind === 'figure') out.push(`**${c.spec.title}**`, '', c.spec.caption, '');
-      else if (c?.kind === 'table') {
-        out.push(`**${c.spec.title}**`, '',
-          `| ${c.spec.columns.join(' | ')} |`,
-          `| ${c.spec.columns.map(() => '---').join(' | ')} |`);
-        for (const r of c.spec.rows) out.push(`| ${r.join(' | ')} |`);
-        out.push('');
-      }
-      return;
-    }
-    if (/^h[123]$/.test(tag)) { out.push(`${'#'.repeat(Number(tag[1]))} ${inline(el)}`, ''); return; }
-    if (tag === 'ul' || tag === 'ol') {
-      [...el.children].forEach((li, i) => out.push(`${tag === 'ul' ? '-' : `${i + 1}.`} ${inline(li)}`));
-      out.push(''); return;
-    }
-    if (tag === 'blockquote') { out.push(`> ${inline(el)}`, ''); return; }
-    if (tag === 'hr') { out.push('---', ''); return; }
-    if (el.querySelector('ul, ol, h1, h2, h3')) { [...el.children].forEach(emit); return; }
-
-    const text = inline(el).trim();
-    if (!text) return;
-    out.push(text);
-    const src = el.getAttribute('data-src');
-    if (src) out.push('', `<sub>${src}</sub>`);
-    out.push('');
-  };
-
-  [...box.children].forEach(emit);
-  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+export async function exportNote(note) {
+  try {
+    const blob = await buildDocx([note], { sources: store.prefs().showSources !== false });
+    download(blob, `${fileName(noteTitle(note))}.docx`);
+    toast('Exported as Word document');
+  } catch (err) {
+    console.error(err);
+    toast('That note could not be exported.');
+  }
 }
 
-export function exportNote(note) {
-  const url = URL.createObjectURL(new Blob([noteToMarkdown(note)], { type: 'text/markdown;charset=utf-8' }));
-  const a = h('a', { href: url, download: `${noteTitle(note).replace(/[^\w-]+/g, '-').toLowerCase()}.md` });
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-  toast('Note exported');
+export async function exportNotes(notes, name) {
+  if (!notes.length) { toast('Nothing to export'); return; }
+  try {
+    const blob = await buildDocx(notes, { sources: store.prefs().showSources !== false });
+    download(blob, `${name}.docx`);
+    toast(`${notes.length} notes exported as Word`);
+  } catch (err) {
+    console.error(err);
+    toast('The notebook could not be exported.');
+  }
 }
+
+const fileName = (s2) => (s2 || 'note').replace(/[^\w\s-]+/g, '').trim()
+  .replace(/\s+/g, '-').toLowerCase().slice(0, 60) || 'note';
 
 /* ── resize ───────────────────────────────────────────────────────────── */
 

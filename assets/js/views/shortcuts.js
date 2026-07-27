@@ -38,6 +38,8 @@ const GROUPS = [
       [[mod, 'J'], 'Open or close the panel'],
       [[mod, 'B'], 'Bold'],
       [[mod, 'I'], 'Italic'],
+      [[mod, 'U'], 'Underline'],
+      [[mod, 'Z'], 'Undo'],
     ],
   },
 ];

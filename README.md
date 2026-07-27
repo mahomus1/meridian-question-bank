@@ -52,12 +52,21 @@ whatever note the panel is showing is where a clipped passage, figure, or table
 goes. Switching notes switches the destination, and you can always see which one
 it is.
 
-**Writing tools that stay out of the way.** Select any text and a small bar
-appears with bold, italic, underline, headings, lists, and quote; the shortcuts
-you already know work too. Markdown shorthand converts as you type — `## ` makes
-a heading, `- ` a bullet, `1. ` a numbered list. The first line of a note is its
-title, so there is no separate field for it and nothing is ever called
-"Untitled".
+**A real toolbar.** Undo and redo, a paragraph-style menu (body, title,
+heading, subheading, quote, code block), bold, italic, underline, strikethrough,
+text colour, highlight, bulleted and numbered lists, indent and outdent,
+alignment, links, and clear formatting. The shortcuts you already know work too.
+Markdown shorthand converts as you type — `## ` makes a heading, `- ` a bullet,
+`1. ` a numbered list, `> ` a quote. The first line of a note is its title, so
+there is no separate field for it and nothing is ever called "Untitled".
+
+**Export to Word.** A note or the whole notebook exports as a genuine `.docx` —
+an Office Open XML package built and zipped in the browser, not an HTML file
+wearing the extension. Headings, lists, quotes, colour, and every run-level mark
+become real Word constructs; clipped tables become real Word tables; and figures
+are rasterised and embedded as images, forced to the light palette so a note
+written in dark mode still prints. There is no dependency and no build step —
+the ZIP writer is about a hundred lines.
 
 **Clippings are just text.** A passage sent from a question becomes an ordinary
 paragraph — same face, no frame, no background, nothing marking it as an
@@ -69,7 +78,7 @@ be moved anywhere.
 
 **Notebooks and notes.** Notebooks are folders you create, name, colour, and
 delete. The Notes page is a plain list for finding something again; the writing
-happens in the panel. Export a note or the whole notebook as Markdown.
+happens in the panel. Export a note or the whole notebook as Word.
 
 **Know where you stand.** Accuracy over time, by category, and by difficulty,
 each with the peer average marked for comparison, plus coverage of the bank.
