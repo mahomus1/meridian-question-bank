@@ -622,8 +622,6 @@
 /* ── notebook ───────────────────────────────────────────────────────── */
 
 .nb { display: grid; grid-template-columns: 210px 296px minmax(0, 1fr); height: 100%; min-height: 0; }
-@media (max-width: 1180px) { .nb { grid-template-columns: 262px minmax(0, 1fr); } .nb__rail { display: none; } }
-@media (max-width: 800px) { .nb { grid-template-columns: 1fr; } .nb__list { display: none; } .nb--list .nb__list { display: grid; } .nb--list .nb__editor { display: none; } }
 
 .nb__rail {
   border-right: 1px solid var(--rule); background: var(--surface);
@@ -746,6 +744,19 @@
 }
 .md strong { font-weight: 650; }
 .md a { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
+
+/* Breakpoints live after the component rules so they actually win — an
+   earlier media query loses to a later base rule of equal specificity. */
+@media (max-width: 1180px) {
+  .nb { grid-template-columns: 296px minmax(0, 1fr); }
+  .nb__rail { display: none; }
+}
+@media (max-width: 820px) {
+  .nb { grid-template-columns: minmax(0, 1fr); }
+  .nb__list { display: none; }
+  .nb--list .nb__list { display: grid; }
+  .nb--list .nb__editor { display: none; }
+}
 
 /* ── performance ────────────────────────────────────────────────────── */
 
