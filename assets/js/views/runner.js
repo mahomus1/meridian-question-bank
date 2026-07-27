@@ -219,6 +219,10 @@ export default async function runner({ id }) {
 
     fill(mainHost, inner);
 
+    // Selecting an answer re-renders the item, so the previous highlighter must
+    // come off first — it holds listeners on document and on the scroller that
+    // would otherwise accumulate for the length of the test.
+    detachHl?.();
     detachHl = attachHighlighter(inner, {
       qid: q.id,
       onChange: () => drawRail(),
