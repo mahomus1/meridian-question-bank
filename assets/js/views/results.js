@@ -19,18 +19,17 @@ export default async function results({ id }) {
     };
   }
 
+  // Score from this test's own picks against the key in the index. Reading the
+  // global answer record instead would let a later retake rewrite this result.
   const rows = test.qids.map((qid, i) => {
     const m = meta(qid);
     const pick = test.picks[qid] || null;
-    const a = store.answerFor(qid);
-    // The recorded answer belongs to this test only if it was locked here.
-    const key = test.locked[qid] && a ? (a.ok ? pick : null) : null;
     return {
       i, qid, m, pick,
-      ok: test.locked[qid] && a ? a.ok : (pick ? null : false),
+      key: m?.key || null,
+      ok: pick ? pick === m?.key : false,
       omitted: !pick,
       ms: test.spent[qid] || 0,
-      keyLetter: key,
     };
   });
 
@@ -142,17 +141,10 @@ export default async function results({ id }) {
               h('td.sm', r.m ? cat(r.m.cat)?.abbr : '—'),
               h('td', r.m ? diffPips(r.m.diff, { withName: false }) : '—'),
               h('td.c.mono', r.pick || '—'),
-              h('td.c.mono', r.ok === true ? r.pick : (r.m ? keyOf(r.qid) : '—')),
+              h('td.c.mono', r.key || '—'),
               h('td.r.num', r.ms ? `${Math.round(r.ms / 1000)}s` : '—'),
               h('td.r.num.muted', r.m ? `${r.m.pct}%` : '—')))))
           : empty({ title: 'Nothing in this view' })));
-  }
-
-  // The key letter lives in the item body; for the table we only need it when
-  // the reader was wrong, and the stored answer tells us the rest.
-  function keyOf(qid) {
-    const a = store.answerFor(qid);
-    return a && a.ok ? a.c : '·';
   }
 
   drawTable();

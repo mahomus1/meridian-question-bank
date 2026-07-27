@@ -722,6 +722,9 @@ for (const cat of CATEGORIES) {
       id: q.id, cat: q.cat, topic: q.topic, archetype: q.archetype,
       archetypeLabel: q.archetypeLabel, diff: q.diff, pct: q.peer.pct,
       n: q.peer.n, avgSec: q.peer.avgSec, ask: q.ask,
+      // The key travels in the index so a results table can score a test from
+      // its own record, without depending on the latest global answer.
+      key: q.key,
       preview: q.stem.paras[0].slice(0, 132).trim() + '…',
       hasFigure: !!q.figure, hasTable: !!q.table,
     });
