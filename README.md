@@ -52,6 +52,13 @@ whatever note the panel is showing is where a clipped passage, figure, or table
 goes. Switching notes switches the destination, and you can always see which one
 it is.
 
+**Writing tools that stay out of the way.** Select any text and a small bar
+appears with bold, italic, underline, headings, lists, and quote; the shortcuts
+you already know work too. Markdown shorthand converts as you type — `## ` makes
+a heading, `- ` a bullet, `1. ` a numbered list. The first line of a note is its
+title, so there is no separate field for it and nothing is ever called
+"Untitled".
+
 **Clippings are just text.** A passage sent from a question becomes an ordinary
 paragraph — same face, no frame, no background, nothing marking it as an
 attachment. Its origin lives on the paragraph as an attribute, shown only as a
@@ -113,6 +120,7 @@ app only depends on the shape of the emitted JSON.
 | `L` | Reference intervals |
 | `⌘J` | Open or close the notebook |
 | `⌥`-click | Rule a choice out (or right-click it, or use the ⊘) |
+| `⌘B` `⌘I` `⌘U` | Bold, italic, underline in a note |
 | `⌘↵` | Save the note you are writing in the item panel |
 
 ## Layout

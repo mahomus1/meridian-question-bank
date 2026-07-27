@@ -238,8 +238,10 @@ async function reader(id) {
   }
 
   const onKey = (ev) => {
+    if (ev.target?.closest?.('.panel, .modal, .palette')) return;
     const t = document.activeElement;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    if (t?.closest?.('.panel, .modal, .palette')) return;
     if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
     if (ev.key === 'h' || ev.key === 'H') { if (highlightSelection('yellow')) ev.preventDefault(); }
     if (ev.key === 'm' || ev.key === 'M') { store.toggleMark(id); toast(store.isMarked(id) ? 'Marked' : 'Unmarked'); }

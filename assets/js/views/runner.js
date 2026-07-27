@@ -290,6 +290,11 @@ export default async function runner({ id }) {
   /* ── answer handling ────────────────────────────────────────────────── */
 
   function pick(letter) {
+    // Choosing an option is the opposite of ruling it out, so it comes back.
+    const struck = test.struck[q.id];
+    const i = struck ? struck.indexOf(letter) : -1;
+    if (i >= 0) struck.splice(i, 1);
+
     test.picks[q.id] = letter;
     store.updateTest(test.id, {});
     if (tutor) drawItem(); else { drawItem(); }
@@ -423,8 +428,11 @@ export default async function runner({ id }) {
   /* ── keyboard ───────────────────────────────────────────────────────── */
 
   const onKey = (ev) => {
+    // Anything typed inside the notebook, a field, or a dialog belongs there.
+    if (ev.target?.closest?.('.panel, .modal, .palette')) return;
     const el2 = document.activeElement;
     if (el2 && (el2.tagName === 'INPUT' || el2.tagName === 'TEXTAREA' || el2.isContentEditable)) return;
+    if (el2?.closest?.('.panel, .modal, .palette')) return;
     if (ev.metaKey || ev.ctrlKey) {
       return;
     }

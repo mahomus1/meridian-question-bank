@@ -234,7 +234,9 @@ function openPalette() {
 
 const isTyping = () => {
   const el = document.activeElement;
-  return el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+  if (!el) return false;
+  if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) return true;
+  return !!el.closest?.('.panel, .modal, .palette');
 };
 
 addEventListener('keydown', (ev) => {

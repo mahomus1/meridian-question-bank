@@ -580,12 +580,6 @@ body.resizing-panel { cursor: col-resize; user-select: none; }
 .panel__body { overflow-y: auto; overscroll-behavior: contain; }
 .panel__inner { padding: 22px 26px 120px 22px; }
 
-.panel__title {
-  width: 100%; border: 0; background: none; padding: 0 0 10px;
-  font-size: 21px; font-weight: 650; letter-spacing: -.018em; color: var(--ink);
-}
-.panel__title:focus { outline: none; }
-.panel__title::placeholder { color: var(--ink-4); }
 
 .panel__foot {
   display: flex; align-items: center; gap: 10px;
@@ -618,8 +612,19 @@ body.resizing-panel { cursor: col-resize; user-select: none; }
 .doc blockquote { border-left: 2px solid var(--rule-2); padding-left: 13px; color: var(--ink-2); }
 .doc hr { border: 0; border-top: 1px solid var(--rule); margin: 20px 0; }
 .doc a { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
+/* The first line is the title, the way a page of paper works. Its weight stays
+   out of bold territory, or the browser reads the line as already bold and the
+   bold command toggles it off instead of on. */
+.doc > *:first-child {
+  font-family: var(--ui); font-size: 20px; font-weight: 500;
+  letter-spacing: -.015em; line-height: 1.32; margin-bottom: 14px;
+  color: var(--ink);
+}
+.doc > *:first-child b, .doc > *:first-child strong { font-weight: 700; }
+.doc > *:first-child:empty::after { content: ""; }
+
 .doc[data-empty="1"]::before {
-  content: "Write here. Anything you send from a question lands in this note.";
+  content: "Title, then write. Anything you send from a question lands here.";
   position: absolute; top: 0; left: 0; pointer-events: none;
   color: var(--ink-4); font-family: var(--ui); font-size: 13.5px;
 }
@@ -708,26 +713,32 @@ body.dragging-block { cursor: grabbing; user-select: none; }
 .chip:hover .chip__gear { opacity: 1; }
 .chip__gear:hover { color: var(--ink); }
 
-.notes__grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); gap: 12px;
-}
-.note-card {
-  display: grid; gap: 6px; align-content: start; text-align: left;
-  padding: 15px 16px; min-height: 128px;
+.notes__list {
   border: 1px solid var(--rule); border-radius: var(--r-lg);
-  background: var(--surface);
-  transition: border-color var(--t), transform var(--t), box-shadow var(--t);
+  background: var(--surface); overflow: hidden;
 }
-.note-card:hover { border-color: var(--rule-2); transform: translateY(-1px); box-shadow: var(--shadow-2); }
-.note-card[aria-current="true"] { border-color: var(--blue-2); box-shadow: inset 0 0 0 1px var(--blue-2); }
-.note-card__t { font-size: 14px; font-weight: 620; letter-spacing: -.008em; }
-.note-card__p {
-  font-family: var(--prose); font-size: 13.5px; line-height: 1.5; color: var(--ink-3);
-  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+.note-row {
+  display: flex; align-items: center; gap: 11px; width: 100%;
+  padding: 11px 15px; text-align: left;
+  border-bottom: 1px solid var(--rule);
+  transition: background var(--t);
 }
-.note-card__m {
-  display: flex; align-items: center; gap: 6px; margin-top: auto;
-  font-size: 11.5px; color: var(--ink-4);
+.note-row:last-child { border-bottom: 0; }
+.note-row:hover { background: var(--surface-2); }
+.note-row[aria-current="true"] {
+  background: var(--blue-tint); box-shadow: inset 2px 0 0 var(--blue);
+}
+.note-row__dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.note-row__t { font-size: 13.5px; font-weight: 600; flex: 0 1 auto; max-width: 42%; }
+.note-row__p {
+  font-family: var(--prose); font-size: 13.5px; color: var(--ink-3); flex: 1 1 auto; min-width: 0;
+}
+.note-row__d { font-size: 11.5px; color: var(--ink-4); flex: none; }
+
+@media (max-width: 720px) {
+  .note-row { flex-wrap: wrap; }
+  .note-row__t { max-width: none; flex: 1 1 auto; }
+  .note-row__p { flex: 1 1 100%; }
 }
 
 /* ── performance ────────────────────────────────────────────────────── */
@@ -790,3 +801,23 @@ body.dragging-block { cursor: grabbing; user-select: none; }
 .hl-row:hover .hl-row__act, .hl-row:focus-within .hl-row__act { opacity: 1; }
 @media (hover: none) { .hl-row__act { opacity: 1; } }
 .hl-row + .hl-row { border-top: 1px solid var(--rule); padding-top: 10px; }
+
+/* ── formatting bar, on selection ───────────────────────────────────── */
+
+.fmt {
+  position: fixed; z-index: 66;
+  display: flex; align-items: center; gap: 1px; padding: 3px;
+  background: var(--ink); border-radius: 8px;
+  box-shadow: var(--shadow-3);
+  animation: pop .13s var(--ease);
+}
+.fmt__b {
+  min-width: 26px; height: 26px; padding: 0 7px; border-radius: 5px;
+  color: #fff; font-size: 12.5px; font-weight: 620;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background var(--t);
+}
+.fmt__b:hover { background: rgba(255, 255, 255, .16); }
+.fmt__b--i { font-family: var(--prose); font-style: italic; }
+.fmt__b--u { text-decoration: underline; text-underline-offset: 2px; }
+.fmt__sep { width: 1px; height: 15px; background: rgba(255, 255, 255, .2); margin: 0 3px; }

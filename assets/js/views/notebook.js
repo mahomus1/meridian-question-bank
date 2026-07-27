@@ -8,7 +8,7 @@ import * as store from '../core/store.js';
 import { ago, n, stamp } from '../core/fmt.js';
 import { htmlToText, excerpt } from '../render/prose.js';
 import { toast, confirm, prompt, modal } from '../features/overlay.js';
-import { openNote, noteToMarkdown } from '../features/notepanel.js';
+import { openNote, noteToMarkdown, noteTitle } from '../features/notepanel.js';
 import { empty } from './parts.js';
 
 export default async function notebook({ noteId }) {
@@ -22,10 +22,14 @@ export default async function notebook({ noteId }) {
   const host = h('div.notes');
   el.appendChild(host);
 
+  /** Everything after the title line, which the row shows separately. */
   const preview = (nt) => {
-    const text = htmlToText(nt.html) || excerpt(nt.body) || '';
-    if (text) return text.length > 150 ? `${text.slice(0, 150)}…` : text;
-    return nt.clips.length ? `${nt.clips.length} figure${nt.clips.length === 1 ? '' : 's'} or tables` : 'Empty';
+    const full = htmlToText(nt.html) || excerpt(nt.body) || '';
+    const title = noteTitle(nt);
+    const rest = full.startsWith(title.replace(/…$/, '')) ? full.slice(title.replace(/…$/, '').length) : full;
+    const text = rest.trim();
+    if (text) return text.length > 160 ? `${text.slice(0, 160)}…` : text;
+    return nt.clips.length ? `${nt.clips.length} figure${nt.clips.length === 1 ? '' : 's'} or tables` : '';
   };
 
   function visible() {
@@ -33,7 +37,7 @@ export default async function notebook({ noteId }) {
     return store.state.notes.filter((nt) => {
       if (book !== 'all' && nt.book !== book) return false;
       if (!q) return true;
-      return `${nt.title} ${htmlToText(nt.html) || nt.body} ${(nt.tags || []).join(' ')}`
+      return `${noteTitle(nt)} ${htmlToText(nt.html) || nt.body} ${(nt.tags || []).join(' ')}`
         .toLowerCase().includes(q);
     });
   }
@@ -92,19 +96,16 @@ export default async function notebook({ noteId }) {
           }, 'New note'))),
 
       notes.length
-        ? h('div.notes__grid', notes.map((nt) => {
+        ? h('div.notes__list', notes.map((nt) => {
           const bk = store.notebookById(nt.book);
-          return h('button.note-card', {
+          return h('button.note-row', {
             'aria-current': String(nt.id === openId),
             onclick: () => { openNote(nt.id); draw(); },
           },
-            h('div.note-card__t', nt.title || 'Untitled note'),
-            h('div.note-card__p', preview(nt)),
-            h('div.note-card__m',
-              h('span.dot', { style: { background: bk?.color || 'var(--ink-4)' } }),
-              h('span.truncate', bk?.name || 'General'),
-              h('span', '·'),
-              h('span', ago(nt.updated))));
+            h('span.note-row__dot', { style: { background: bk?.color || 'var(--ink-4)' } }),
+            h('span.note-row__t.truncate', noteTitle(nt)),
+            h('span.note-row__p.truncate', preview(nt)),
+            h('span.note-row__d', ago(nt.updated)));
         }))
         : empty({
           mark: '✎',
