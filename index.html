@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Meridian — Question Bank</title>
+<meta name="description" content="A board-style question bank with custom test assembly, peer-referenced difficulty, and an integrated notebook.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23123E75'/><path d='M8 22V10h3l5 8 5-8h3v12h-3v-6.6l-3.6 5.6h-2.8L11 15.4V22z' fill='white'/></svg>">
+<link rel="stylesheet" href="assets/css/app.css">
+<link rel="stylesheet" href="assets/css/views.css">
+</head>
+<body>
+
+<div id="boot" class="boot">
+  <div class="boot__mark" aria-hidden="true">M</div>
+  <p class="boot__text">Loading question bank…</p>
+</div>
+
+<noscript>
+  <div class="noscript">Meridian requires JavaScript. Please enable it and reload the page.</div>
+</noscript>
+
+<div class="app" id="app" hidden>
+  <nav class="rail" aria-label="Primary">
+    <a class="rail__brand" href="#/">
+      <span class="rail__mark" aria-hidden="true">M</span>
+      <span class="rail__wordmark">
+        <strong>Meridian</strong>
+        <em>Question Bank</em>
+      </span>
+    </a>
+
+    <div class="rail__group">
+      <p class="rail__label">Study</p>
+      <a class="rail__link" href="#/" data-nav="dashboard"><span class="rail__ico" data-ico="home"></span>Overview</a>
+      <a class="rail__link" href="#/create" data-nav="create"><span class="rail__ico" data-ico="plus"></span>Create test</a>
+      <a class="rail__link" href="#/browse" data-nav="browse"><span class="rail__ico" data-ico="list"></span>Question bank</a>
+    </div>
+
+    <div class="rail__group">
+      <p class="rail__label">Record</p>
+      <a class="rail__link" href="#/notebook" data-nav="notebook"><span class="rail__ico" data-ico="book"></span>Notebook<span class="rail__count" data-count="notes"></span></a>
+      <a class="rail__link" href="#/performance" data-nav="performance"><span class="rail__ico" data-ico="chart"></span>Performance</a>
+      <a class="rail__link" href="#/tests" data-nav="tests"><span class="rail__ico" data-ico="clock"></span>Test history<span class="rail__count" data-count="tests"></span></a>
+    </div>
+
+    <div class="rail__spacer"></div>
+
+    <div class="rail__foot">
+      <div class="rail__progress" id="railProgress"></div>
+      <a class="rail__link rail__link--quiet" href="#/settings" data-nav="settings"><span class="rail__ico" data-ico="gear"></span>Settings</a>
+    </div>
+  </nav>
+
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
+    <main class="view" id="view" tabindex="-1"></main>
+  </div>
+</div>
+
+<div class="overlays">
+  <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+  <div class="sel-pop" id="selPop" hidden></div>
+  <div class="modal" id="modal" hidden></div>
+  <div class="palette" id="palette" hidden></div>
+</div>
+
+<script type="module" src="assets/js/main.js"></script>
+</body>
+</html>
