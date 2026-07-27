@@ -164,6 +164,11 @@ export function htmlToText(html) {
   box.querySelectorAll('.doc-clip').forEach((el) => {
     el.replaceWith(document.createTextNode(` ${el.dataset.summary || ''} `));
   });
+  // Blocks carry no whitespace of their own, so their text would otherwise
+  // run together — "hyperkalaemiaCalcium first".
+  box.querySelectorAll('p, div, li, blockquote, h1, h2, h3, tr').forEach((el) => {
+    el.appendChild(document.createTextNode(' '));
+  });
   return box.textContent.replace(/\s+/g, ' ').trim();
 }
 
