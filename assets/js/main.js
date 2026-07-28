@@ -170,7 +170,7 @@ function openPalette() {
     { label: 'Overview', hint: 'Page', go: '/' },
     { label: 'Create test', hint: 'Page', go: '/create' },
     { label: 'Question bank', hint: 'Page', go: '/browse' },
-    { label: 'Notebook', hint: 'Page', go: '/notebook' },
+    { label: 'Notes', hint: 'Page', go: '/notebook' },
     { label: 'Highlights', hint: 'Page', go: '/highlights' },
     { label: 'Performance', hint: 'Page', go: '/performance' },
     { label: 'Test history', hint: 'Page', go: '/tests' },
