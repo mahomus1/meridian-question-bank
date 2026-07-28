@@ -605,31 +605,29 @@ body.resizing-panel { cursor: col-resize; user-select: none; }
 .doc > * { margin: 0 0 12px; }
 .doc > *:last-child { margin-bottom: 0; }
 .doc p { min-height: 1.66em; }
+/* Three levels that have to be told apart at a glance, so each step changes
+   size and weight together rather than relying on size alone. They mirror the
+   16/14/12pt the .docx exports, and none drops below the 16px body — a
+   heading smaller than its own text reads as a caption. */
 .doc h1, .doc h2, .doc h3 {
-  font-family: var(--ui); letter-spacing: -.015em; margin: 20px 0 6px; line-height: 1.3;
+  font-family: var(--ui); letter-spacing: -.015em; line-height: 1.3;
+  color: var(--ink);
 }
-.doc h1 { font-size: 19px; font-weight: 650; }
-.doc h2 { font-size: 17px; font-weight: 640; }
-.doc h3 { font-size: 15px; font-weight: 640; }
+.doc h1 { font-size: 20px; font-weight: 660; margin: 26px 0 8px; }
+.doc h2 { font-size: 18.5px; font-weight: 650; margin: 22px 0 7px; }
+.doc h3 { font-size: 16px; font-weight: 680; margin: 18px 0 6px; }
+/* Nothing above the first heading, so it should not push off the top edge. */
+.doc > h1:first-child, .doc > h2:first-child, .doc > h3:first-child { margin-top: 0; }
 .doc ul, .doc ol { margin-left: 20px; }
 .doc ul li { list-style: disc; margin-bottom: 4px; }
 .doc ol li { list-style: decimal; margin-bottom: 4px; }
 .doc blockquote { border-left: 2px solid var(--rule-2); padding-left: 13px; color: var(--ink-2); }
 .doc hr { border: 0; border-top: 1px solid var(--rule); margin: 20px 0; }
 .doc a { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
-/* The first line is the title, the way a page of paper works. Its weight stays
-   out of bold territory, or the browser reads the line as already bold and the
-   bold command toggles it off instead of on. */
-.doc > *:first-child {
-  font-family: var(--ui); font-size: 20px; font-weight: 500;
-  letter-spacing: -.015em; line-height: 1.32; margin-bottom: 14px;
-  color: var(--ink);
-}
-.doc > *:first-child b, .doc > *:first-child strong { font-weight: 700; }
 .doc > *:first-child:empty::after { content: ""; }
 
 .doc[data-empty="1"]::before {
-  content: "Title, then write. Anything you send from a question lands here.";
+  content: "Start writing. Anything you save from a question lands here.";
   position: absolute; top: 0; left: 0; pointer-events: none;
   color: var(--ink-4); font-family: var(--ui); font-size: 13.5px;
 }
@@ -923,6 +921,32 @@ body.dragging-block { cursor: grabbing; user-select: none; }
 .tb__ink { border-bottom: 3px solid var(--blue); line-height: 1.1; }
 .tb__mark { background: #fde68a; color: #101f33; padding: 0 3px; border-radius: 2px; }
 
+/* split button: face applies the last colour, caret opens the palette */
+.tb__split { flex: none; display: inline-flex; align-items: center; }
+.tb__split__face {
+  min-width: 22px; padding: 0 3px;
+  border-radius: var(--r-sm) 0 0 var(--r-sm);
+}
+.tb__split__more {
+  min-width: 0; width: 13px; padding: 0;
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+}
+.tb__split__more::after {
+  content: ""; width: 9px; height: 9px; background: var(--ink-3);
+  -webkit-mask: var(--chev-d) center / 9px no-repeat;
+  mask: var(--chev-d) center / 9px no-repeat;
+  --chev-d: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m2.5 4.5 3.5 3.5 3.5-3.5'/%3E%3C/svg%3E");
+}
+.tb__split__more:hover::after { background: var(--ink); }
+/* Hovering either half lights the whole control, so it reads as one button. */
+.tb__split:hover .tb__b { background: var(--surface-3); color: var(--ink); }
+
+/* Ring kept tight: the swatch gap is 5px, so a wider one would touch its
+   neighbours. */
+.tb__sw[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / .14), 0 0 0 1.5px var(--surface), 0 0 0 3px var(--blue);
+}
+
 .tb__sep { width: 1px; height: 16px; background: var(--rule-2); margin: 0 4px; }
 
 .tb__sel {
@@ -985,16 +1009,13 @@ body.dragging-block { cursor: grabbing; user-select: none; }
 .doc-caret.on { opacity: .5; pointer-events: auto; }
 
 /* the note's own title, above the document */
+/* Clearly above Heading 1, or the note's name and its first section read as
+   the same rank. */
 .note-title {
-  width: 100%; border: 0; background: none; padding: 0 0 4px;
-  font-family: var(--ui); font-size: 22px; font-weight: 650;
-  letter-spacing: -.02em; color: var(--ink);
+  width: 100%; border: 0; background: none; padding: 0 0 8px;
+  font-family: var(--ui); font-size: 25px; font-weight: 670;
+  letter-spacing: -.022em; color: var(--ink);
 }
 .note-title:focus { outline: none; }
 .note-title::placeholder { color: var(--ink-4); font-weight: 600; }
 
-/* With a title of its own, the first line is just a line. */
-.doc > *:first-child {
-  font-family: var(--prose); font-size: 16px; font-weight: 400;
-  letter-spacing: 0; line-height: 1.66; margin-bottom: 12px;
-}

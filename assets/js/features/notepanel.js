@@ -340,10 +340,11 @@ function exec(cmd, arg, { css = false } = {}) {
 const TEXT_COLORS = ['#101f33', '#14549c', '#126640', '#9e2f24', '#8a6212', '#6c7b8e'];
 const MARK_COLORS = ['#fde68a', '#bfdbfe', '#bbf7d0', '#fbcfe8', '#e9d5ff'];
 
-function swatchPop(anchor, colors, onPick, { clearLabel } = {}) {
+function swatchPop(anchor, colors, onPick, { clearLabel, current } = {}) {
   const pop = h('div.tb__pop',
     h('div.tb__swatches', colors.map((c) => h('button.tb__sw', {
       style: { background: c }, title: c,
+      'aria-pressed': String(c === current),
       onmousedown: (ev) => ev.preventDefault(),
       onclick: () => { onPick(c); pop.remove(); },
     }))),
@@ -365,9 +366,47 @@ function swatchPop(anchor, colors, onPick, { clearLabel } = {}) {
   setTimeout(() => document.addEventListener('mousedown', away, true), 0);
 }
 
+/* Word splits its colour buttons in two: the face reapplies whatever you chose
+   last, and only the caret opens the palette. Opening the palette to pick the
+   same yellow again is two presses for a decision already made. */
+function colourControl({ title, colors, pref, fallback, glyphClass, cmd, off, clearLabel }) {
+  const glyph = h(`span.${glyphClass}`, 'A');
+  const chosen = () => store.prefs()[pref] || fallback;
+  const paint = () => {
+    if (glyphClass === 'tb__ink') glyph.style.borderBottomColor = chosen();
+    else glyph.style.background = chosen();
+  };
+  const apply = (c) => exec(cmd, c, { css: true });
+
+  const hold = (ev) => { ev.preventDefault(); rememberRange(); };
+
+  const wrap = h('span.tb__split',
+    h('button.tb__b.tb__split__face', {
+      type: 'button', title: `${title} — apply the last colour`,
+      onmousedown: hold,
+      onclick: () => apply(chosen()),
+    }, glyph),
+    h('button.tb__b.tb__split__more', {
+      type: 'button', title: `${title} — choose a colour`,
+      'aria-label': `${title}: choose a colour`,
+      onmousedown: hold,
+      onclick: (ev) => swatchPop(ev.currentTarget.parentElement, colors, (c) => {
+        if (c) { store.setPref(pref, c); paint(); }
+        apply(c || off);
+      }, { clearLabel, current: chosen() }),
+    }));
+
+  paint();
+  return wrap;
+}
+
+/* Named for the Word styles they export as, so what you pick here is what you
+   get in the .docx. The note has a title field of its own, so the document
+   starts at Heading 1 rather than offering a second title. */
 const BLOCKS = [
-  ['p', 'Body'], ['h1', 'Title'], ['h2', 'Heading'], ['h3', 'Subheading'],
-  ['blockquote', 'Quote'], ['pre', 'Code block'],
+  ['p', 'Body'],
+  ['h1', 'Heading 1'], ['h2', 'Heading 2'], ['h3', 'Heading 3'],
+  ['blockquote', 'Quote'],
 ];
 
 let styleSelect = null;
@@ -397,19 +436,15 @@ function toolbar() {
     b('U', 'Underline  ⌘U', () => exec('underline'), '.tb__b--u'),
     b('S', 'Strikethrough', () => exec('strikeThrough'), '.tb__b--s'),
     sep(),
-    h('button.tb__b', {
-      type: 'button', title: 'Text colour',
-      onmousedown: (ev) => { ev.preventDefault(); rememberRange(); },
-      onclick: (ev) => swatchPop(ev.currentTarget, TEXT_COLORS,
-        (c) => exec('foreColor', c || '#101f33', { css: true })),
-    }, h('span.tb__ink', 'A')),
-    h('button.tb__b', {
-      type: 'button', title: 'Highlight',
-      onmousedown: (ev) => { ev.preventDefault(); rememberRange(); },
-      onclick: (ev) => swatchPop(ev.currentTarget, MARK_COLORS,
-        (c) => exec('hiliteColor', c || 'transparent', { css: true }),
-        { clearLabel: 'None' }),
-    }, h('span.tb__mark', 'A')),
+    colourControl({
+      title: 'Text colour', colors: TEXT_COLORS, pref: 'inkColor',
+      fallback: '#14549c', glyphClass: 'tb__ink', cmd: 'foreColor', off: '#101f33',
+    }),
+    colourControl({
+      title: 'Highlight', colors: MARK_COLORS, pref: 'markColor',
+      fallback: '#fde68a', glyphClass: 'tb__mark', cmd: 'hiliteColor',
+      off: 'transparent', clearLabel: 'None',
+    }),
     sep(),
     b('•', 'Bulleted list', () => exec('insertUnorderedList')),
     b('1.', 'Numbered list', () => exec('insertOrderedList')),
@@ -460,24 +495,48 @@ function syncToolbar() {
 export function insertAtCaret(noteId, html) {
   if (!isOpen() || !docEl || activeNote()?.id !== noteId) return false;
 
-  const frag = document.createRange().createContextualFragment(html);
-  const blocks = [...frag.children];
-  if (!blocks.length) return false;
+  // After the paragraph the caret was in, so the reader's place is kept. A
+  // figure cannot hold a caret, so fall back to the nearest block that can.
+  const typable = (el) => el && !el.classList.contains('doc-obj');
+  let at = lastBlock && lastBlock.parentElement === docEl ? lastBlock : null;
+  while (at && !typable(at)) at = at.nextElementSibling;
+  if (!at) at = [...docEl.children].reverse().find(typable);
+  if (!at) return false;
 
-  const at = lastBlock && lastBlock.parentElement === docEl ? lastBlock : null;
+  /* Routed through execCommand rather than appending the nodes directly: the
+     browser only records edits it performs itself, so a passage dropped in by
+     hand would sit outside the undo stack and ⌘Z would skip straight past it
+     to whatever was typed before.
 
-  if (at) {
-    // After the paragraph the caret was in, so the reader's place is kept.
-    at.after(frag);
-  } else {
-    docEl.appendChild(frag);
-  }
+     It has to go in as one command, or undoing one saved passage would take
+     two presses. That rules out breaking the paragraph first, so the break
+     rides along in the payload: dropped at the end of a written line the
+     browser unwraps the first block and merges it inline, losing the block
+     and its attribution, but an empty paragraph ahead of it absorbs that.
+     The empty paragraph left behind at the end is where the caret lands, so
+     the next passage arrives into an empty block and needs no spacer. */
+  const TAIL = '<p><br></p>';
+  const roomy = !at.textContent.trim() && !at.querySelector('.doc-obj');
+  const payload = (roomy ? '' : TAIL) + (html.endsWith(TAIL) ? html : html + TAIL);
+
+  docEl.focus();
+  const caret = document.createRange();
+  caret.selectNodeContents(at);
+  caret.collapse(false);
+  const sel = getSelection();
+  sel.removeAllRanges();
+  sel.addRange(caret);
+
+  const before = new Set(docEl.children);
+  document.execCommand('insertHTML', false, payload);
+  const added = [...docEl.children].filter((el) => !before.has(el));
 
   hydrate(activeNote());
   markEmpty();
 
   // Leave the caret after what was just placed, ready to keep writing.
-  const last = blocks[blocks.length - 1];
+  const last = added[added.length - 1] || docEl.lastElementChild;
+  if (!last) return false;
   const r = document.createRange();
   r.selectNodeContents(last);
   r.collapse(false);
