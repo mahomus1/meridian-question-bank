@@ -48,19 +48,13 @@ function offsetIn(block, node, offset) {
   return n;
 }
 
-/** Current selection as { block, blockId, start, end, text } or null. */
-function readSelection(root) {
-  const sel = getSelection();
-  if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
-  const range = sel.getRangeAt(0);
-  if (!root.contains(range.commonAncestorContainer)) return null;
-
-  const block = blockOf(range.startContainer);
-  if (!block || block !== blockOf(range.endContainer)) return null;
-
+/** The slice of `range` that falls inside one block, trimmed to word edges. */
+function partOf(block, range) {
   const text = block.textContent;
-  let start = offsetIn(block, range.startContainer, range.startOffset);
-  let end = offsetIn(block, range.endContainer, range.endOffset);
+  let start = block.contains(range.startContainer)
+    ? offsetIn(block, range.startContainer, range.startOffset) : 0;
+  let end = block.contains(range.endContainer)
+    ? offsetIn(block, range.endContainer, range.endOffset) : text.length;
   if (start > end) [start, end] = [end, start];
 
   // Trim to word edges so a sloppy drag does not capture surrounding space.
@@ -68,7 +62,33 @@ function readSelection(root) {
   while (end > start && /\s/.test(text[end - 1])) end--;
   if (end - start < 2) return null;
 
-  return { block, blockId: block.dataset.hl, start, end, text: text.slice(start, end), rect: range.getBoundingClientRect() };
+  return { blockId: block.dataset.hl, start, end, text: text.slice(start, end) };
+}
+
+/** Current selection as { parts, text, rect } or null. */
+function readSelection(root) {
+  const sel = getSelection();
+  if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
+  const range = sel.getRangeAt(0);
+  if (!root.contains(range.commonAncestorContainer)) return null;
+
+  /* Within one block the offsets come from that block alone. Across several,
+     every highlightable block the drag crossed contributes its own range, so
+     selecting over a paragraph break marks each paragraph rather than
+     silently doing nothing. */
+  const start = blockOf(range.startContainer);
+  const blocks = start && start === blockOf(range.endContainer)
+    ? [start]
+    : [...root.querySelectorAll('[data-hl]')].filter((b) => range.intersectsNode(b));
+
+  const parts = blocks.map((b) => partOf(b, range)).filter(Boolean);
+  if (!parts.length) return null;
+
+  return {
+    parts,
+    text: parts.map((p) => p.text).join('\n\n'),
+    rect: range.getBoundingClientRect(),
+  };
 }
 
 /* ── popover ──────────────────────────────────────────────────────────── */
@@ -110,8 +130,10 @@ function popForSelection(sel, at) {
   const { qid, root, onChange } = active;
 
   const add = (colorId) => {
-    store.addHighlight(qid, { block: sel.blockId, start: sel.start, end: sel.end, color: colorId });
-    repaintBlock(sel.blockId);
+    for (const p of sel.parts) {
+      store.addHighlight(qid, { block: p.blockId, start: p.start, end: p.end, color: colorId });
+      repaintBlock(p.blockId);
+    }
     getSelection().removeAllRanges();
     hidePopover();
     onChange?.();
@@ -123,9 +145,15 @@ function popForSelection(sel, at) {
     h('button.sel-pop__btn', {
       type: 'button',
       onclick: () => {
-        store.addHighlight(qid, { block: sel.blockId, start: sel.start, end: sel.end, color: 'yellow' });
-        repaintBlock(sel.blockId);
-        clipText({ qid, text: sel.text, source: sourceLabel(sel.blockId, root), color: 'yellow' });
+        for (const p of sel.parts) {
+          store.addHighlight(qid, { block: p.blockId, start: p.start, end: p.end, color: 'yellow' });
+          repaintBlock(p.blockId);
+        }
+        clipText({
+          qid,
+          text: sel.parts.length === 1 ? sel.parts[0].text : sel.parts.map((p) => p.text),
+          source: sourceLabel(sel.parts[0].blockId, root),
+        });
         getSelection().removeAllRanges();
         hidePopover();
         onChange?.();
@@ -201,7 +229,7 @@ function repaintBlock(blockId) {
 }
 
 /** Human-readable origin of a passage, used as the clip's source line. */
-function sourceLabel(blockId, root) {
+export function sourceLabel(blockId, root) {
   const el = root?.querySelector(`[data-hl="${CSS.escape(blockId)}"]`);
   const named = el?.dataset.hlLabel;
   if (named) return named;
@@ -298,10 +326,12 @@ export function highlightSelection(colorId = 'yellow') {
   if (!active) return false;
   const sel = readSelection(active.root);
   if (!sel) return false;
-  store.addHighlight(active.qid, {
-    block: sel.blockId, start: sel.start, end: sel.end, color: colorId,
-  });
-  repaintBlock(sel.blockId);
+  for (const p of sel.parts) {
+    store.addHighlight(active.qid, {
+      block: p.blockId, start: p.start, end: p.end, color: colorId,
+    });
+    repaintBlock(p.blockId);
+  }
   getSelection().removeAllRanges();
   hidePopover();
   active.onChange?.();

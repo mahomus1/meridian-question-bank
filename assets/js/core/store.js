@@ -48,6 +48,11 @@ function load() {
     for (const note of data.notes || []) {
       if ((note.title || '').trim() === 'Untitled note') note.title = '';
     }
+    // Highlights made before ranges folded together may sit as touching
+    // fragments of one passage; replaying them through the fold joins them.
+    for (const [qid, list] of Object.entries(data.highlights || {})) {
+      data.highlights[qid] = foldList(list);
+    }
     return {
       ...base, ...data,
       profile: { ...base.profile, ...data.profile, prefs: { ...base.profile.prefs, ...(data.profile?.prefs) } },
@@ -328,9 +333,12 @@ export function buildClip(noteId, clip) {
   if (!n) return null;
 
   if (clip.kind === 'text' || clip.kind === 'question') {
-    const html = `<p data-src="${attr(clip.source || '')}"`
+    // A passage spanning paragraphs arrives as one per paragraph, each
+    // carrying the origin, so splitting the note later splits the credit too.
+    const texts = Array.isArray(clip.text) ? clip.text : [clip.text];
+    const html = texts.map((t) => `<p data-src="${attr(clip.source || '')}"`
       + (clip.qid ? ` data-qid="${attr(clip.qid)}"` : '')
-      + `>${escText(clip.text)}</p>`;
+      + `>${escText(t)}</p>`).join('');
     return { rec: null, html };
   }
 
@@ -371,10 +379,46 @@ export function removeClip(noteId, clipId) {
 
 /* ── highlights ───────────────────────────────────────────────────────── */
 
-export function addHighlight(qid, { block, start, end, color }) {
-  if (!state.highlights[qid]) state.highlights[qid] = [];
-  const hl = { id: uid('h'), b: block, s: start, e: end, c: color };
-  state.highlights[qid].push(hl);
+/* Two gestures that build one visual mark should file as one passage. A new
+   range absorbs same-colour ranges it touches — a gap of one character is the
+   space the word-edge trim removed — and trims different-colour ranges it
+   covers, so what is stored is exactly what the paint shows. */
+function foldIn(list, rec) {
+  let { s, e, at, note } = rec;
+  const keep = [];
+  for (const r of list) {
+    if (r.b !== rec.b) { keep.push(r); continue; }
+    if (r.c === rec.c && r.s <= e + 1 && r.e + 1 >= s) {
+      s = Math.min(s, r.s);
+      e = Math.max(e, r.e);
+      if (r.at && (!at || r.at < at)) at = r.at;   // an extended mark keeps its date
+      note = note || r.note;
+    } else if (r.c !== rec.c && r.s < e && r.e > s) {
+      if (r.s < s) keep.push({ ...r, e: s });
+      if (r.e > e) keep.push({ ...r, id: r.s < s ? uid('h') : r.id, s: e });
+    } else {
+      keep.push(r);
+    }
+  }
+  const hl = { id: rec.id || uid('h'), b: rec.b, s, e, c: rec.c };
+  if (at) hl.at = at;
+  if (note) hl.note = note;
+  keep.push(hl);
+  return { list: keep, hl };
+}
+
+function foldList(list) {
+  return (list || []).reduce((acc, r) => foldIn(acc, r).list, []);
+}
+
+export function addHighlight(qid, spec) {
+  const { block, start, end, color, id, note } = spec;
+  // A restored highlight keeps the date it had — including having none.
+  const at = 'at' in spec ? spec.at : Date.now();
+  const { list, hl } = foldIn(state.highlights[qid] || [], {
+    id, b: block, s: start, e: end, c: color, at, note,
+  });
+  state.highlights[qid] = list;
   changed('highlights', qid);
   return hl;
 }
@@ -382,9 +426,12 @@ export function addHighlight(qid, { block, start, end, color }) {
 export const highlightsFor = (qid) => state.highlights[qid] || [];
 
 export function updateHighlight(qid, id, patch) {
-  const hl = (state.highlights[qid] || []).find((x) => x.id === id);
+  const cur = state.highlights[qid] || [];
+  const hl = cur.find((x) => x.id === id);
   if (!hl) return null;
   Object.assign(hl, patch);
+  // Recolouring can leave same-colour neighbours touching; fold them together.
+  if (patch.c) state.highlights[qid] = foldList(cur);
   changed('highlights', qid);
   return hl;
 }
