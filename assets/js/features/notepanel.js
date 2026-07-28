@@ -15,7 +15,7 @@ import { h, fill, $ } from '../core/dom.js';
 import * as store from '../core/store.js';
 import { meta, cat } from '../core/bank.js';
 import { go } from '../core/router.js';
-import { ago } from '../core/fmt.js';
+import { ago, stamp } from '../core/fmt.js';
 import { markdown } from '../render/prose.js';
 import { buildDocx, download } from './docx.js';
 import { figureSvg } from '../render/figure.js';
@@ -763,7 +763,9 @@ function browseNotes() {
     const shut = collapsed();
 
     fill(body, store.state.notebooks.map((book) => {
-      const notes = store.state.notes.filter((n) => n.book === book.id);
+      const notes = store.state.notes
+        .filter((n) => n.book === book.id)
+        .sort((a, b) => b.updated - a.updated);
       const isShut = shut.has(book.id);
 
       return h('section.shelf__book',
@@ -864,6 +866,17 @@ export function notebookSettings(book, after) {
             toast('Notebook deleted');
           },
         }, 'Delete')
+        : null,
+      count
+        ? h('button.btn', {
+          onclick: () => {
+            close();
+            exportWith(
+              store.state.notes.filter((x) => x.book === book.id),
+              `meridian-${fileName(book.name)}-${stamp()}`,
+            );
+          },
+        }, 'Export')
         : null,
       h('button.btn.btn--primary', {
         onclick: () => {

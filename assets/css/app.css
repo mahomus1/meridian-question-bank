@@ -509,6 +509,7 @@ h1, h2, h3, h4 { font-weight: 600; line-height: 1.25; }
   transition: background var(--t), border-color var(--t), color var(--t);
 }
 .chip:hover { border-color: var(--ink-4); color: var(--ink); }
+.chip:disabled { opacity: .45; pointer-events: none; }
 .chip[aria-pressed="true"] {
   background: var(--blue-tint); border-color: var(--blue-2); color: var(--blue);
   font-weight: 600;

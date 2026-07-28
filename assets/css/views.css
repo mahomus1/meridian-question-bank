@@ -780,6 +780,8 @@ body.dragging-block { cursor: grabbing; user-select: none; }
 .shelf__notes { display: grid; }
 
 /* a note inside a notebook */
+.shelf__rowwrap { position: relative; }
+.shelf__rowwrap.is-dragging { opacity: .4; }
 .shelf__row {
   display: grid; align-items: baseline; gap: 12px; width: 100%;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.6fr) auto;
@@ -787,7 +789,7 @@ body.dragging-block { cursor: grabbing; user-select: none; }
   border-top: 1px solid var(--rule);
   transition: background var(--t);
 }
-.shelf__row:first-child { border-top: 0; }
+.shelf__rowwrap:first-child .shelf__row { border-top: 0; }
 .shelf__row:hover { background: var(--surface-2); }
 .shelf__row[aria-current="true"] {
   background: var(--blue-tint);
@@ -798,7 +800,31 @@ body.dragging-block { cursor: grabbing; user-select: none; }
 .shelf__row-d {
   font-size: 11.5px; color: var(--ink-4); white-space: nowrap;
   justify-self: end; font-variant-numeric: tabular-nums;
+  transition: opacity var(--t);
 }
+
+/* the row's own options, sitting where the date is until the row is hovered */
+.shelf__rowwrap > .shelf__more {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+}
+.shelf__rowwrap:hover > .shelf__more,
+.shelf__rowwrap:focus-within > .shelf__more { opacity: 1; }
+.shelf__rowwrap:hover .shelf__row-d,
+.shelf__rowwrap:focus-within .shelf__row-d { opacity: 0; }
+@media (hover: none) { .shelf__rowwrap .shelf__row-d { display: none; } }
+
+/* the match, inside a search result's preview */
+.shelf__hit {
+  background: var(--hl-yellow); color: inherit;
+  border-radius: 2px; padding: .05em 0;
+}
+
+/* a notebook ready to take the note being dragged over it */
+.shelf__book--drop {
+  border-color: var(--blue-2);
+  box-shadow: 0 0 0 1px var(--blue-2) inset;
+}
+.shelf__book--drop .shelf__head { background: var(--blue-tint); }
 
 .shelf__empty {
   width: 100%; padding: 12px 26px; text-align: left;
@@ -888,6 +914,8 @@ body.dragging-block { cursor: grabbing; user-select: none; }
 
 .hl-row { display: flex; align-items: flex-start; gap: 11px; }
 .hl-row__bar { width: 4px; align-self: stretch; border-radius: 2px; flex: none; min-height: 22px; }
+.hl-row__main { display: grid; gap: 3px; min-width: 0; justify-items: start; }
+.hl-row__meta { font-size: 11.5px; color: var(--ink-4); font-variant-numeric: tabular-nums; }
 .hl-row__t {
   font-family: var(--prose); font-size: 15px; line-height: 1.55;
   padding-top: 1px; text-align: left; cursor: pointer;

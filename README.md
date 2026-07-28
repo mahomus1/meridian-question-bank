@@ -35,12 +35,17 @@ the same. Ruled-out choices grey out and strike through, and can be brought
 back. A one-time tip points the control out, then never appears again.
 
 **Highlight and clip.** Select any passage in a vignette or explanation to
-highlight it in one of four colours. Highlights are stored as character offsets
-against a stable block id, so they survive reloads and re-renders. Figures and
-tables in explanations carry their own *Save to notebook* action, and a clipped
-figure keeps its spec — so it redraws with the theme rather than pasting a stale
-image. The **Highlights** page collects every passage you have marked across the
-bank, filterable by colour and category, each one a click from its item.
+highlight it in one of four colours — across paragraph breaks, each paragraph
+takes its own mark. Highlights are stored as character offsets against a stable
+block id, so they survive reloads and re-renders, and marks that touch fold into
+one passage rather than accumulating as fragments. Figures and tables in
+explanations carry their own *Save to notebook* action, and a clipped figure
+keeps its spec — so it redraws with the theme rather than pasting a stale image.
+The **Highlights** page collects every passage you have marked across the bank
+in the order it appears inside each item, named by the section it came from and
+when it was made. Filter by colour or category, sort by item or by recency, send
+a passage to the notebook (it remembers which note it went to), or remove it —
+with an undo, not a dialog.
 
 **The notebook sits beside the page.** One editor panel opens on any view —
 mid-question, browsing the bank, anywhere — so a thought goes down without
@@ -79,8 +84,12 @@ plainly inline without a frame. Every block has a drag handle, so anything can
 be moved anywhere.
 
 **Notebooks and notes.** Notebooks are folders you create, name, colour, and
-delete. The Notes page is a plain list for finding something again; the writing
-happens in the panel. Export a note or the whole notebook as Word.
+delete. The Notes page is a plain list for finding something again: notebooks
+with their notes inside, freshest edit first. Search matches titles, bodies, and
+notebook names, and shows the matching line with the match marked. Filing is
+direct — drag a note onto another notebook, or open the row's options to move,
+export, or delete it without opening it. Export a note, a notebook, or
+everything as Word.
 
 **Know where you stand.** Accuracy over time, by category, and by difficulty,
 each with the peer average marked for comparison, plus coverage of the bank.
