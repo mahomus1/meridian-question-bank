@@ -10,6 +10,7 @@ import { figureBlock } from './figure.js';
 import { tableBlock, vitalsStrip, labTable } from './table.js';
 import * as store from '../core/store.js';
 import { bandLabel } from '../core/bank.js';
+import { library, sectionForArchetype } from '../core/library.js';
 
 /** Vignette: clinical paragraphs, vitals, laboratory panel, and the lead-in. */
 export function vignette(q) {
@@ -25,10 +26,10 @@ export function vignette(q) {
 /**
  * Explanation block.
  * @param {object} q
- * @param {{picked?:string|null, mySec?:number, onClipFigure?:Function, onClipTable?:Function, showPeer?:boolean}} opts
+ * @param {{picked?:string|null, mySec?:number, onClipFigure?:Function, onClipTable?:Function, showPeer?:boolean, onTopic?:Function}} opts
  */
 export function explanation(q, {
-  picked = null, mySec = 0, onClipFigure, onClipTable, showPeer = true,
+  picked = null, mySec = 0, onClipFigure, onClipTable, showPeer = true, onTopic,
 } = {}) {
   const hls = store.highlightsFor(q.id);
   const right = picked === q.key;
@@ -72,10 +73,46 @@ export function explanation(q, {
 
     block('div.objective', q.teach.objective, 'objective', hls),
 
-    h('h3', 'Related topics in this bank'),
-    h('div.related', q.related.map((t) => h('span.badge', t))),
+    libraryFooter(q, onTopic),
   );
 }
+
+/* The way from an item into the reading it comes from. It sits at the end of
+   the explanation, where a reader who wants more has just finished wanting it,
+   and opens the section this item examines rather than the top of the topic. */
+function libraryFooter(q, onTopic) {
+  const id = (name) => library.byQuestionTopic.get(`${q.cat}|${name}`);
+  const mine = id(q.topic);
+  const section = sectionForArchetype(q.archetype);
+  const related = (q.related || []).map((name) => ({ name, tid: id(name) }));
+
+  if (!mine && !related.some((r) => r.tid)) {
+    // No library built: keep the plain list rather than an empty section.
+    return frag(
+      h('h3', 'Related topics in this bank'),
+      h('div.related', (q.related || []).map((t) => h('span.badge', t))));
+  }
+
+  return frag(
+    h('h3', 'In the library'),
+    mine
+      ? h('div.expl__lib',
+        h('div.grow',
+          h('b', q.topic),
+          h('p', `Read the full topic — this item examines ${sectionName(section)}.`)),
+        h('button.btn.btn--sm.btn--primary', {
+          onclick: () => onTopic?.(mine, section),
+        }, 'Read topic'))
+      : null,
+    h('div.related',
+      related.map(({ name, tid }) => (tid
+        ? h('button.badge.badge--link', { onclick: () => onTopic?.(tid, null) }, name)
+        : h('span.badge', name)))),
+  );
+}
+
+const sectionName = (id) => (library.index?.meta.sections || [])
+  .find((s) => s.id === id)?.heading.toLowerCase() || 'this topic';
 
 /** Static answer list used where choices are not interactive. */
 export function staticChoices(q, { picked = null, showPeer = true } = {}) {

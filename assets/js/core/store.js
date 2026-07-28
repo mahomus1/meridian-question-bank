@@ -338,6 +338,7 @@ export function buildClip(noteId, clip) {
     const texts = Array.isArray(clip.text) ? clip.text : [clip.text];
     const html = texts.map((t) => `<p data-src="${attr(clip.source || '')}"`
       + (clip.qid ? ` data-qid="${attr(clip.qid)}"` : '')
+      + (clip.topic ? ` data-topic="${attr(clip.topic)}"` : '')
       + `>${escText(t)}</p>`).join('');
     return { rec: null, html };
   }

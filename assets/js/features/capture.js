@@ -37,6 +37,20 @@ export function clipText({ qid, text, source }) {
   return place(note, { kind: 'text', qid, text, source: sourceOf(qid, source) }, 'Passage');
 }
 
+/**
+ * A passage from the library. It carries the topic rather than a question, so
+ * the mark in the margin leads back to the reading it was taken from.
+ */
+export function clipPassage({ topicId, title, text, source }) {
+  const note = activeNote();
+  return place(note, {
+    kind: 'text',
+    topic: topicId,
+    text,
+    source: [source, title, 'Library'].filter(Boolean).join(' · '),
+  }, 'Passage');
+}
+
 export function clipQuestion({ qid }) {
   const note = activeNote();
   const m = meta(qid);

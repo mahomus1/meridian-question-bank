@@ -3,8 +3,10 @@
 import { h, fill, $, $$ } from './core/dom.js';
 import * as store from './core/store.js';
 import { loadIndex, bank, filterItems } from './core/bank.js';
+import { loadLibraryIndex, library, searchTopics } from './core/library.js';
 import { route, start, go, render as rerender, here } from './core/router.js';
 import { toast } from './features/overlay.js';
+import { closeSheet } from './features/sheet.js';
 import * as panel from './features/notepanel.js';
 import { n as num } from './core/fmt.js';
 import { htmlToText } from './render/prose.js';
@@ -61,7 +63,7 @@ function paintRail() {
   const map = {
     '': 'dashboard', create: 'create', browse: 'browse', notebook: 'notebook',
     performance: 'performance', tests: 'tests', settings: 'settings',
-    highlights: 'highlights',
+    highlights: 'highlights', library: 'library',
     test: 'tests', results: 'tests',
   };
   const activeKey = map[seg] ?? '';
@@ -111,6 +113,8 @@ route('/test/:id', lazy('./views/runner.js'));
 route('/results/:id', lazy('./views/results.js'));
 route('/tests', lazy('./views/tests.js'));
 route('/highlights', lazy('./views/highlights.js'));
+route('/library', lazy('./views/library.js'));
+route('/library/:topicId', lazy('./views/library.js'));
 route('/notebook', lazy('./views/notebook.js'));
 route('/notebook/:noteId', lazy('./views/notebook.js'));
 route('/performance', lazy('./views/performance.js'));
@@ -118,6 +122,9 @@ route('/settings', lazy('./views/settings.js'));
 
 function paint(view, ctx) {
   const host = $('#view');
+  // The sheet reads over one page. Moving to another leaves it behind, the way
+  // closing a book does — including when the sheet itself did the navigating.
+  closeSheet();
 
   if (!view) {
     fill(host, h('div.wrap',
@@ -172,6 +179,7 @@ function openPalette() {
     { label: 'Overview', hint: 'Page', go: '/' },
     { label: 'Create test', hint: 'Page', go: '/create' },
     { label: 'Question bank', hint: 'Page', go: '/browse' },
+    { label: 'Library', hint: 'Page', go: '/library' },
     { label: 'Notes', hint: 'Page', go: '/notebook' },
     { label: 'Highlights', hint: 'Page', go: '/highlights' },
     { label: 'Performance', hint: 'Page', go: '/performance' },
@@ -184,6 +192,10 @@ function openPalette() {
     if (!query) return NAV;
     const out = NAV.filter((x) => x.label.toLowerCase().includes(query));
 
+    for (const t of searchTopics(query, 8)) {
+      out.push({ label: t.title, hint: 'Topic', go: `/library/${t.id}` });
+    }
+
     for (const note of store.state.notes) {
       if (out.length > 22) break;
       const text = `${note.title} ${htmlToText(note.html) || note.body}`;
@@ -191,7 +203,7 @@ function openPalette() {
         out.push({ label: panel.noteTitle(note), hint: 'Note', go: `/notebook/${note.id}` });
       }
     }
-    const items = filterItems({ query }).slice(0, 22 - out.length);
+    const items = filterItems({ query }).slice(0, Math.max(0, 22 - out.length));
     for (const it of items) {
       out.push({ label: `${it.topic} — ${it.archetypeLabel}`, hint: it.id, go: `/browse/${it.id}` });
     }
@@ -284,6 +296,8 @@ const ASSETS = [
   'assets/js/views/highlights.js', 'assets/js/views/performance.js',
   'assets/js/views/tests.js', 'assets/js/views/settings.js',
   'assets/js/views/parts.js', 'assets/js/views/shortcuts.js',
+  'assets/js/core/library.js', 'assets/js/features/sheet.js',
+  'assets/js/render/topic.js', 'assets/js/views/library.js',
 ];
 
 async function refreshIfStale() {
@@ -312,6 +326,11 @@ async function boot() {
 
   try {
     await loadIndex();
+    // The library is not what the reader came for, so a missing or broken
+    // library file costs them the reading, not the bank.
+    await loadLibraryIndex().catch((err) => {
+      console.warn('Meridian: the library could not be loaded.', err);
+    });
   } catch (err) {
     $('#boot').innerHTML = '';
     $('#boot').appendChild(h('div.empty',

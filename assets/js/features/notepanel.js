@@ -350,7 +350,7 @@ function autoFormat() {
   const sel = getSelection();
   if (!sel?.isCollapsed) return;
   const block = blockOf(sel.anchorNode);
-  if (!block || block.tagName !== 'P' || block.dataset.qid) return;
+  if (!block || block.tagName !== 'P' || block.dataset.qid || block.dataset.topic) return;
 
   const text = block.textContent;
   for (const [re, apply] of RULES) {
@@ -662,7 +662,7 @@ function hideCaretMark() { caretMark?.classList.remove('on'); }
    landing in that gutter opens the question — a drag that happens to finish
    near the edge is a text selection, not a request to navigate away. */
 function onDocClick(ev) {
-  const p = ev.target.closest?.('[data-qid]');
+  const p = ev.target.closest?.('[data-qid], [data-topic]');
   if (!p || !docEl.contains(p)) return;
   if (docEl.dataset.sources === 'off') return;
 
@@ -675,7 +675,8 @@ function onDocClick(ev) {
   if (ev.clientX < r.right - gutter) return;
 
   ev.preventDefault();
-  go(`/browse/${p.dataset.qid}`);
+  // A passage knows where it came from — a question, or the reading itself.
+  go(p.dataset.qid ? `/browse/${p.dataset.qid}` : `/library/${p.dataset.topic}`);
 }
 
 /* ── keys ─────────────────────────────────────────────────────────────── */
@@ -698,12 +699,13 @@ function onKey(ev) {
      out of the split empty is the reader's own, and loses the source. */
   if (ev.key === 'Enter') {
     const from = blockOf(getSelection().anchorNode);
-    if (from?.dataset.src || from?.dataset.qid) {
+    if (from?.dataset.src || from?.dataset.qid || from?.dataset.topic) {
       setTimeout(() => {
         const made = blockOf(getSelection().anchorNode);
         if (made && made !== from && !made.textContent.trim()) {
           delete made.dataset.src;
           delete made.dataset.qid;
+          delete made.dataset.topic;
           queue(() => ({ html: serialise() }));
         }
       }, 0);

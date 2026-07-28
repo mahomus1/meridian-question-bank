@@ -23,6 +23,7 @@ const GROUPS = [
       [['→'], 'Next item'],
       [['M'], 'Mark this item for review'],
       [['H'], 'Highlight the selected passage'],
+      [['R'], 'Read this topic in the library'],
       [['L'], 'Open reference intervals'],
       [['\u2325', 'click'], 'Rule a choice out (or right-click it, or use the \u2298)'],
     ],
@@ -30,7 +31,14 @@ const GROUPS = [
   {
     name: 'Reading an item', keys: [
       [['H'], 'Highlight the selected passage'],
+      [['R'], 'Read this topic in the library'],
       [['M'], 'Mark for review'],
+    ],
+  },
+  {
+    name: 'In the library', keys: [
+      [['H'], 'Highlight the selected passage'],
+      [['Esc'], 'Close the reading sheet'],
     ],
   },
   {

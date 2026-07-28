@@ -640,15 +640,18 @@ body.resizing-panel { cursor: col-resize; user-select: none; }
 /* The mark sits inside a gutter of the paragraph's own box, so it can be
    clicked — and so the click test has a region to test against that is not
    the text itself. */
-.doc[data-sources="on"] p[data-qid] { position: relative; padding-right: 20px; }
-.doc[data-sources="on"] p[data-qid]::after {
+.doc[data-sources="on"] p[data-qid],
+.doc[data-sources="on"] p[data-topic] { position: relative; padding-right: 20px; }
+.doc[data-sources="on"] p[data-qid]::after,
+.doc[data-sources="on"] p[data-topic]::after {
   content: "";
   position: absolute; top: .6em; right: 5px;
   width: 5px; height: 5px; border-radius: 50%;
   background: var(--rule-2);
   transition: background var(--t), transform var(--t);
 }
-.doc[data-sources="on"] p[data-qid]:hover::after {
+.doc[data-sources="on"] p[data-qid]:hover::after,
+.doc[data-sources="on"] p[data-topic]:hover::after {
   background: var(--blue); transform: scale(1.35); cursor: pointer;
 }
 
@@ -1107,3 +1110,314 @@ mark.hl--found { animation: hl-found 2.2s var(--ease); }
 .panel--shutting { opacity: .35; }
 .panel--shutting .panel__grip { background: color-mix(in srgb, var(--blue) 40%, transparent); }
 body.resizing-panel .panel { transition: opacity .12s var(--ease); }
+
+/* ══ the reading sheet ════════════════════════════════════════════════ */
+
+/* Placed in the shell's own grid at the main column, which is what keeps it
+   off the notebook: the note stays in column three, readable and writable,
+   while the sheet covers only the page being read. */
+.sheet-layer {
+  grid-column: 2; grid-row: 1;
+  position: relative; z-index: 20;
+  display: flex; justify-content: flex-end;
+  min-width: 0;
+}
+
+.sheet__scrim {
+  position: absolute; inset: 0;
+  background: color-mix(in srgb, var(--ink) 22%, transparent);
+  animation: fade .16s var(--ease);
+  cursor: pointer;
+}
+
+.sheet {
+  position: relative;
+  display: grid; grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0; max-width: 100%;
+  background: var(--surface);
+  border-left: 1px solid var(--rule);
+  box-shadow: var(--shadow-3);
+  animation: sheet-in .24s var(--ease);
+}
+@keyframes sheet-in { from { transform: translateX(18px); opacity: 0 } }
+
+.sheet__grip {
+  position: absolute; left: -3px; top: 0; bottom: 0; width: 7px; z-index: 3;
+  cursor: col-resize;
+}
+.sheet__grip:hover { background: color-mix(in srgb, var(--blue) 26%, transparent); }
+.sheet--shutting { opacity: .35; }
+.sheet--shutting .sheet__grip { background: color-mix(in srgb, var(--blue) 40%, transparent); }
+body.resizing-panel .sheet { transition: opacity .12s var(--ease); }
+
+.sheet__head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 12px 9px 14px;
+  border-bottom: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--surface-2) 70%, var(--surface));
+  min-height: 46px;
+}
+.sheet__title { display: grid; gap: 1px; min-width: 0; flex: 1; }
+.sheet__title h2 { font-size: 14.5px; font-weight: 650; letter-spacing: -.01em; }
+.sheet__title p { font-size: 11.5px; color: var(--ink-3); }
+.sheet__act { display: flex; align-items: center; gap: 6px; flex: none; margin-left: auto; }
+
+.sheet__ico {
+  width: 27px; height: 27px; border-radius: var(--r-sm); flex: none;
+  display: grid; place-content: center;
+  color: var(--ink-3); font-size: 13px;
+  transition: background var(--t), color var(--t);
+}
+.sheet__ico:hover { background: var(--surface-3); color: var(--ink); }
+.sheet__ico[aria-pressed="true"] { background: var(--blue-tint); color: var(--blue); }
+
+.sheet__load { padding: 40px; text-align: center; font-size: 13px; color: var(--ink-4); }
+
+/* Contents beside the text, the way a bound volume carries them. */
+.sheet__body {
+  display: grid; grid-template-columns: 186px minmax(0, 1fr);
+  min-height: 0;
+}
+.sheet__body--plain, .sheet--noToc .sheet__body { grid-template-columns: minmax(0, 1fr); }
+.sheet--noToc .sheet__toc { display: none; }
+
+.sheet__toc {
+  border-right: 1px solid var(--rule);
+  padding: 14px 10px; overflow-y: auto;
+  background: var(--surface-2);
+}
+.sheet__toc .label { padding: 0 8px 8px; display: block; }
+.sheet__toc-list { display: grid; gap: 1px; }
+.sheet__toc-l {
+  display: block; width: 100%; text-align: left;
+  padding: 5px 8px; border-radius: var(--r-sm);
+  font-size: 12.5px; color: var(--ink-2); line-height: 1.35;
+  transition: background var(--t), color var(--t);
+}
+.sheet__toc-l:hover { background: var(--surface-3); color: var(--ink); }
+
+.sheet__toggle {
+  display: flex; align-items: center; gap: 7px; cursor: pointer;
+  margin-top: 14px; padding: 8px; border-top: 1px solid var(--rule);
+  font-size: 12px; color: var(--ink-2); user-select: none;
+}
+.sheet__toggle input { accent-color: var(--blue); width: 13px; height: 13px; }
+.sheet__toggle-n {
+  margin-left: auto; font-size: 10.5px; font-weight: 620;
+  color: var(--ink-4); font-variant-numeric: tabular-nums;
+}
+
+.sheet__doc { min-height: 0; overflow-y: auto; }
+.sheet__inner { max-width: 74ch; padding: 26px 30px 90px; }
+.sheet__item { max-width: none; }
+
+/* Below the width where a column of its own makes sense, the sheet is the
+   page: full bleed, contents folded away behind its button. */
+@media (max-width: 1000px) {
+  .sheet-layer { position: fixed; inset: 0; z-index: 46; }
+  .sheet { width: 100% !important; border-left: 0; }
+  .sheet__grip { display: none; }
+  .sheet__body { grid-template-columns: minmax(0, 1fr); }
+  .sheet__toc { display: none; }
+  .sheet__inner { padding: 20px 18px 80px; }
+}
+
+/* ══ a library topic, as a document ═══════════════════════════════════ */
+
+.topic { font-family: var(--prose); font-size: 16.5px; line-height: 1.68; color: var(--ink); }
+.topic__lead {
+  font-size: 17.5px; line-height: 1.6; color: var(--ink-2);
+  padding-bottom: 16px; margin-bottom: 4px;
+  border-bottom: 1px solid var(--rule);
+}
+.topic__sec { margin-top: 26px; }
+.topic__h {
+  font-family: var(--ui); font-size: 15px; font-weight: 660;
+  letter-spacing: .0;
+  padding-bottom: 6px; margin-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+  scroll-margin-top: 12px;
+}
+.topic p { margin-bottom: 12px; }
+.topic p:last-child { margin-bottom: 0; }
+.topic__sec, .topic { min-width: 0; }
+/* A wide comparison table scrolls within its own box rather than widening the
+   column the prose is set in. */
+.topic .xtab { margin: 16px 0; max-width: 100%; }
+.topic .xtab .table-wrap { max-width: 100%; overflow-x: auto; }
+
+.topic__keys {
+  margin-top: 18px; padding: 13px 15px;
+  border-left: 2px solid var(--blue);
+  background: var(--blue-tint);
+  border-radius: 0 var(--r) var(--r) 0;
+}
+.topic__keys .label { margin-bottom: 7px; }
+.topic__keys ul { display: grid; gap: 5px; }
+.topic__keys li {
+  font-size: 14.5px; line-height: 1.5; padding-left: 15px; position: relative;
+}
+.topic__keys li::before {
+  content: ""; position: absolute; left: 0; top: .62em;
+  width: 4px; height: 4px; border-radius: 50%; background: var(--blue);
+}
+
+.topic__related { margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--rule); }
+.topic__related .label { margin-bottom: 8px; }
+
+/* The bank's questions, filed under the passage each one examines. */
+.topic__qs {
+  margin-top: 16px; padding: 12px 14px;
+  border: 1px solid var(--rule); border-radius: var(--r);
+  background: var(--surface-2);
+}
+.topic__qs .label { margin-bottom: 8px; }
+.topic__qlist { display: grid; gap: 1px; min-width: 0; }
+/* A grid item will not shrink below its content unless told to, which is what
+   let a long lead-in push the whole document sideways. */
+.topic__q {
+  display: flex; align-items: center; gap: 9px; width: 100%; min-width: 0;
+  padding: 7px 8px; border-radius: var(--r-sm); text-align: left;
+  font-family: var(--ui); font-size: 12.5px; color: var(--ink-2);
+  transition: background var(--t), color var(--t);
+}
+.topic__q:hover { background: var(--surface); color: var(--ink); }
+.topic__q-id {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-4); flex: none;
+}
+.topic__q-ask { flex: 1; min-width: 0; }
+
+/* The item's own way into the reading, at the end of its explanation. */
+.expl__lib {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; margin-bottom: 12px;
+  border: 1px solid var(--rule-2); border-radius: var(--r);
+  background: var(--surface-2);
+}
+.expl__lib b { font-size: 14px; font-weight: 640; }
+.expl__lib p { font-size: 12.5px; color: var(--ink-3); margin-top: 1px; }
+
+.badge--link {
+  cursor: pointer;
+  transition: background var(--t), color var(--t);
+}
+.badge--link:hover { background: var(--blue-tint); color: var(--blue); }
+
+/* ══ the library viewer ═══════════════════════════════════════════════ */
+
+/* Sized against the space the viewer actually has rather than the window's
+   width: with the notebook open the page is a third narrower, and a layout
+   that only watched the viewport would keep three columns in room for one. */
+.lib-wrap { container: lib / inline-size; height: 100%; min-height: 0; }
+
+.lib {
+  display: grid;
+  grid-template-columns: 234px minmax(0, 1fr) 190px;
+  height: 100%; min-height: 0;
+}
+
+.lib-nav {
+  border-right: 1px solid var(--rule);
+  padding: 16px 10px 30px; overflow-y: auto;
+  background: var(--surface);
+  min-height: 0;
+}
+.lib-nav__back {
+  display: block; padding: 4px 8px 10px;
+  font-size: 12px; color: var(--ink-3);
+}
+.lib-nav__back:hover { color: var(--blue); }
+.lib-nav__ch {
+  display: flex; align-items: center; gap: 7px;
+  padding: 0 8px 8px;
+  font-size: 11px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.lib-nav ul { display: grid; gap: 1px; }
+.lib-nav__t {
+  display: block; width: 100%; text-align: left;
+  padding: 6px 9px; border-radius: var(--r);
+  font-size: 13px; color: var(--ink-2); line-height: 1.35;
+  transition: background var(--t), color var(--t);
+}
+.lib-nav__t:hover { background: var(--surface-2); color: var(--ink); }
+.lib-nav__t[aria-current="true"] {
+  background: var(--blue-tint); color: var(--blue); font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--blue);
+}
+
+.lib-doc { min-height: 0; overflow-y: auto; background: var(--paper); }
+.lib-doc__inner { max-width: 76ch; margin: 0 auto; padding: 34px 40px 100px; }
+.lib-doc__head { margin-bottom: 20px; }
+.lib-doc__ch {
+  display: flex; align-items: center; gap: 7px; margin-bottom: 7px;
+  font-size: 11px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.lib-doc__head h1 {
+  font-size: 31px; font-weight: 660; letter-spacing: -.022em; line-height: 1.15;
+}
+.lib-doc .topic { font-size: 17px; }
+.lib-doc .notice { margin-top: 30px; }
+
+.lib-toc {
+  border-left: 1px solid var(--rule);
+  padding: 34px 12px 30px; overflow-y: auto;
+  min-height: 0;
+}
+.lib-toc .label { display: block; padding: 0 8px 8px; }
+.lib-toc ul { display: grid; gap: 1px; }
+.lib-toc__l {
+  display: block; width: 100%; text-align: left;
+  padding: 4px 8px; border-radius: var(--r-sm);
+  font-size: 12px; color: var(--ink-3); line-height: 1.35;
+  border-left: 2px solid transparent;
+  transition: color var(--t), border-color var(--t);
+}
+.lib-toc__l:hover { color: var(--ink); }
+.lib-toc__l[aria-current="true"] {
+  color: var(--blue); border-left-color: var(--blue); font-weight: 600;
+}
+
+/* contents listing */
+.lib-topics { display: grid; }
+.lib-topic {
+  display: grid; gap: 2px; width: 100%; text-align: left;
+  padding: 10px 16px 10px 26px;
+  border-top: 1px solid var(--rule);
+  transition: background var(--t);
+}
+.lib-topic:first-child { border-top: 0; }
+.lib-topic:hover { background: var(--surface-2); }
+.lib-topic__t { font-size: 13.5px; font-weight: 600; }
+.lib-topic__s { font-family: var(--prose); font-size: 13px; color: var(--ink-3); }
+
+.lib-hits { display: grid; gap: 1px; border: 1px solid var(--rule); border-radius: var(--r-lg); overflow: hidden; }
+.lib-hit {
+  display: grid; grid-template-columns: auto auto auto minmax(0, 1fr);
+  align-items: baseline; gap: 10px; width: 100%; text-align: left;
+  padding: 10px 14px; background: var(--surface);
+  border-top: 1px solid var(--rule);
+  transition: background var(--t);
+}
+.lib-hit:first-child { border-top: 0; }
+.lib-hit:hover { background: var(--surface-2); }
+.lib-hit__t { font-size: 13.5px; font-weight: 620; }
+.lib-hit__c { font-size: 11.5px; color: var(--ink-4); }
+.lib-hit__s { font-family: var(--prose); font-size: 13px; color: var(--ink-3); }
+
+@container lib (max-width: 1000px) {
+  .lib { grid-template-columns: 216px minmax(0, 1fr); }
+  .lib-toc { display: none; }
+  .lib-doc__inner { padding: 30px 28px 90px; }
+}
+@container lib (max-width: 680px) {
+  .lib { grid-template-columns: minmax(0, 1fr); }
+  .lib-nav { display: none; }
+  .lib-doc__inner { padding: 22px 18px 80px; }
+  .lib-doc__head h1 { font-size: 26px; }
+}
+@media (max-width: 860px) {
+  .lib-hit { grid-template-columns: auto minmax(0, 1fr); }
+  .lib-hit__c, .lib-hit__s { grid-column: 1 / -1; }
+}

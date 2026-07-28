@@ -14,6 +14,8 @@ import { block } from '../render/prose.js';
 import { vignette, explanation as explanationBlock } from '../render/item.js';
 import { attachHighlighter, highlightSelection, hidePopover } from '../features/highlight.js';
 import { clipFigure, clipTable, clipQuestion } from '../features/capture.js';
+import { openTopic } from '../features/sheet.js';
+import { topicForQuestion, sectionForArchetype } from '../core/library.js';
 import { toast, confirm, modal } from '../features/overlay.js';
 import { diffPips, catTag, empty } from './parts.js';
 
@@ -284,6 +286,7 @@ export default async function runner({ id }) {
       showPeer: store.prefs().showPeer,
       onClipFigure: () => clipFigure({ qid: q.id, spec: q.figure }),
       onClipTable: () => clipTable({ qid: q.id, spec: q.table }),
+      onTopic: (tid, section) => openTopic(tid, { section }),
     });
   }
 
@@ -465,6 +468,11 @@ export default async function runner({ id }) {
         if (highlightSelection('yellow')) ev.preventDefault();
         break;
       case 'l': case 'L': ev.preventDefault(); showReference(); break;
+      case 'r': case 'R': {
+        const t = topicForQuestion(meta(q.id));
+        if (t) { ev.preventDefault(); openTopic(t.id, { section: sectionForArchetype(meta(q.id).archetype) }); }
+        break;
+      }
       default: break;
     }
   };

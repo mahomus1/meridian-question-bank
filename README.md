@@ -2,7 +2,8 @@
 
 A board-style question bank: 1,000 sample items across ten internal-medicine
 categories, with custom test assembly, peer-referenced difficulty, passage
-highlighting, and an integrated notebook.
+highlighting, an integrated notebook, and a 120-topic library you can read
+alongside any question.
 
 It runs entirely in the browser. No account, no server, no build step, no
 dependencies. Everything you create — answers, tests, highlights, notes — is
@@ -41,11 +42,33 @@ block id, so they survive reloads and re-renders, and marks that touch fold into
 one passage rather than accumulating as fragments. Figures and tables in
 explanations carry their own *Save to notebook* action, and a clipped figure
 keeps its spec — so it redraws with the theme rather than pasting a stale image.
-The **Highlights** page collects every passage you have marked across the bank
-in the order it appears inside each item, named by the section it came from and
-when it was made. Filter by colour or category, sort by item or by recency, send
-a passage to the notebook (it remembers which note it went to), or remove it —
-with an undo, not a dialog.
+The library highlights the same way, into the same place. The **Highlights**
+page collects every passage you have marked — from the bank and from the
+library — in the order it appears inside each item or topic, named by the
+section it came from and when it was made. Filter by colour, category, or
+source, sort by position or by recency, send a passage to the notebook (it
+remembers which note it went to), or remove it — with an undo, not a dialog.
+
+**A library to read from.** Every topic in the bank has a written entry —
+overview, mechanism, presentation, examination, diagnosis, management, pitfalls
+— with key points and a comparison table. The end of every explanation links to
+the entry for that item's topic, and opens it *at the section the item
+examines*: a management question opens at Management.
+
+**It opens over the question, not instead of it.** The reading sheet takes the
+page's column and leaves the notebook alone, so you can read, highlight, and
+write into a note at once. Drag its edge to resize; carry on past the point of
+readability and it closes, the same gesture the notebook uses. Contents sit
+beside the text, `Esc` closes, and *Open in library* promotes it to the full
+viewer — chapter contents on the left, the text at a readable measure, and the
+topic's sections on the right. Going the other way, opening a question from the
+library brings it up as a sheet over the reading. Following a link inside the
+sheet keeps a trail, so ‹ returns you to where you were.
+
+**Questions beside the passage they examine.** A switch in the library shows
+the bank's items for that topic filed under the section each one tests, because
+the sections and the question archetypes are the same five angles. Off by
+default.
 
 **The notebook sits beside the page.** One editor panel opens on any view —
 mid-question, browsing the bank, anywhere — so a thought goes down without
@@ -120,6 +143,12 @@ mechanism, physical findings) into 1,000 items, writing:
 - `data/index.json` — the light index loaded at boot; drives every filter and count
 - `data/questions/<category>.json` — full item bodies, fetched per category on demand
 - `data/reference.json` — the laboratory reference intervals sheet
+- `data/library.json` — the library index: chapters, topics, and section plan
+- `data/library/<category>.json` — full topic bodies, fetched per chapter on demand
+
+`tools/library.mjs` writes the library from the same taxonomy, one entry per
+topic. Its sections are keyed to the question archetypes, which is what lets the
+reader show each item beside the passage it examines.
 
 Generation is seeded, so the same input always produces the same bank.
 
@@ -137,7 +166,9 @@ app only depends on the shape of the emitted JSON.
 | `←` `→` | Previous / next item |
 | `M` | Mark for review |
 | `H` | Highlight the selection |
+| `R` | Read this topic in the library |
 | `L` | Reference intervals |
+| `Esc` | Close the reading sheet |
 | `⌘J` | Open or close the notebook |
 | `⌥`-click | Rule a choice out (or right-click it, or use the ⊘) |
 | `⌘B` `⌘I` `⌘U` | Bold, italic, underline in a note |
@@ -149,9 +180,9 @@ app only depends on the shape of the emitted JSON.
 index.html              application shell
 assets/css/app.css      tokens, reset, layout, primitives
 assets/css/views.css    per-view styling
-assets/js/core/         dom, store, bank, router, formatting
-assets/js/render/       figures, tables, prose, shared item rendering
-assets/js/features/     highlighting, notebook capture, overlays
+assets/js/core/         dom, store, bank, library, router, formatting
+assets/js/render/       figures, tables, prose, shared item and topic rendering
+assets/js/features/     highlighting, notebook capture, reading sheet, overlays
 assets/js/views/        one module per route, lazily imported
 data/                   generated question bank
 tools/                  generator, topic content, dev server

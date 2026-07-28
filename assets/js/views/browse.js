@@ -11,6 +11,8 @@ import { n, pct } from '../core/fmt.js';
 import { vignette, explanation, staticChoices } from '../render/item.js';
 import { attachHighlighter, highlightSelection, hidePopover } from '../features/highlight.js';
 import { clipFigure, clipTable, clipQuestion } from '../features/capture.js';
+import { openTopic } from '../features/sheet.js';
+import { topicForQuestion, sectionForArchetype } from '../core/library.js';
 import { toast } from '../features/overlay.js';
 import { diffPips, catTag, statusPip, empty } from './parts.js';
 
@@ -216,6 +218,7 @@ async function reader(id, query = {}) {
       showPeer: store.prefs().showPeer,
       onClipFigure: () => clipFigure({ qid: id, spec: q.figure }),
       onClipTable: () => clipTable({ qid: id, spec: q.table }),
+      onTopic: (tid, section) => openTopic(tid, { section }),
     }),
   );
 
@@ -251,6 +254,10 @@ async function reader(id, query = {}) {
     if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
     if (ev.key === 'h' || ev.key === 'H') { if (highlightSelection('yellow')) ev.preventDefault(); }
     if (ev.key === 'm' || ev.key === 'M') { store.toggleMark(id); toast(store.isMarked(id) ? 'Marked' : 'Unmarked'); }
+    if (ev.key === 'r' || ev.key === 'R') {
+      const t = topicForQuestion(m);
+      if (t) { ev.preventDefault(); openTopic(t.id, { section: sectionForArchetype(m.archetype) }); }
+    }
   };
   document.addEventListener('keydown', onKey);
 

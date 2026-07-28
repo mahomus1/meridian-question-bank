@@ -127,7 +127,11 @@ function swatch(color, onPick, current) {
 /** Popover shown for a fresh selection. */
 function popForSelection(sel, at) {
   const pop = $('#selPop');
-  const { qid, root, onChange } = active;
+  const { qid, root, onChange, clip } = active;
+
+  const save = (text, blockId) => (clip
+    ? clip({ text, blockId, label: sourceLabel(blockId, root) })
+    : clipText({ qid, text, source: sourceLabel(blockId, root) }));
 
   const add = (colorId) => {
     for (const p of sel.parts) {
@@ -149,11 +153,10 @@ function popForSelection(sel, at) {
           store.addHighlight(qid, { block: p.blockId, start: p.start, end: p.end, color: 'yellow' });
           repaintBlock(p.blockId);
         }
-        clipText({
-          qid,
-          text: sel.parts.length === 1 ? sel.parts[0].text : sel.parts.map((p) => p.text),
-          source: sourceLabel(sel.parts[0].blockId, root),
-        });
+        save(
+          sel.parts.length === 1 ? sel.parts[0].text : sel.parts.map((p) => p.text),
+          sel.parts[0].blockId,
+        );
         getSelection().removeAllRanges();
         hidePopover();
         onChange?.();
@@ -174,7 +177,7 @@ function popForSelection(sel, at) {
 /** Popover shown when an existing highlight is clicked. */
 function popForHighlight(markEl) {
   const pop = $('#selPop');
-  const { qid, onChange } = active;
+  const { qid, onChange, clip } = active;
   const id = markEl.dataset.id;
   const blockId = markEl.closest('[data-hl]')?.dataset.hl;
   const hl = store.highlightsFor(qid).find((x) => x.id === id);
@@ -197,7 +200,9 @@ function popForHighlight(markEl) {
       : h('button.sel-pop__btn', {
         type: 'button',
         onclick: () => {
-          clipText({ qid, text: markEl.textContent, source: sourceLabel(blockId, active.root) });
+          const label = sourceLabel(blockId, active.root);
+          if (clip) clip({ text: markEl.textContent, blockId, label });
+          else clipText({ qid, text: markEl.textContent, source: label });
           store.updateHighlight(qid, id, { note: activeNote().id });
           repaintBlock(blockId);
           hidePopover();
@@ -245,11 +250,12 @@ export function sourceLabel(blockId, root) {
 /* ── attach ───────────────────────────────────────────────────────────── */
 
 /**
- * Turn on highlighting inside `root` for question `qid`.
- * Returns a detach function.
+ * Turn on highlighting inside `root` for `qid`.
+ * `clip` decides how a saved passage is attributed — a question by default, a
+ * library topic when the caller says so — so one highlighter serves both.
  */
-export function attachHighlighter(root, { qid, onChange } = {}) {
-  active = { root, qid, onChange };
+export function attachHighlighter(root, { qid, onChange, clip } = {}) {
+  active = { root, qid, onChange, clip };
 
   // Paint whatever is already stored.
   const ranges = store.highlightsFor(qid);
