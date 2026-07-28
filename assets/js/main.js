@@ -4,7 +4,7 @@ import { h, fill, $, $$ } from './core/dom.js';
 import * as store from './core/store.js';
 import { loadIndex, bank, filterItems } from './core/bank.js';
 import { loadLibraryIndex, library, searchTopics } from './core/library.js';
-import { route, start, go, render as rerender, here } from './core/router.js';
+import { route, start, go, render as rerender, here, inQuestion, openAway } from './core/router.js';
 import { toast } from './features/overlay.js';
 import { closeSheet } from './features/sheet.js';
 import * as panel from './features/notepanel.js';
@@ -71,6 +71,14 @@ function paintRail() {
     const on = link.dataset.nav === activeKey;
     if (on) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
+  }
+
+  // Say so before it happens, rather than surprising the reader with a tab.
+  const away = inQuestion();
+  for (const link of $$('.rail__link')) {
+    if (away && link.dataset.nav !== activeKey) link.title = 'Opens in a new tab — your question stays here';
+    else link.removeAttribute('title');
+    link.classList.toggle('rail__link--away', away && link.dataset.nav !== activeKey);
   }
 
   const notes = store.state.notes.length;
@@ -245,6 +253,18 @@ function openPalette() {
   document.addEventListener('keydown', onKey, true);
   input.focus();
 }
+
+/* The rail is anchors, so a modified click already opens a tab by itself and
+   is left alone. A plain click mid-question is the one we redirect. */
+document.addEventListener('click', (ev) => {
+  const link = ev.target.closest?.('.rail__link');
+  if (!link || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button !== 0) return;
+  const path = (link.getAttribute('href') || '').replace(/^#/, '');
+  if (!path || !inQuestion()) return;
+  if (path === here()) return;
+  ev.preventDefault();
+  if (openAway(path)) toast('Opened in a new tab — your question is still here', { ms: 2600 });
+});
 
 /* ── global keys ──────────────────────────────────────────────────────── */
 

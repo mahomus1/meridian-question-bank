@@ -66,3 +66,24 @@ export function start(handler) {
   render();
 }
 
+
+/* ── leaving a question ───────────────────────────────────────────────── */
+
+/* Mid-question, following a link costs the reader their place — in a timed
+   test, at the worst possible moment. Everywhere else the app is a single
+   page and moving about is free, so this is the one situation that earns a
+   second tab. */
+export function inQuestion() {
+  const p = here();
+  return /^\/test\/[^/]+/.test(p) || /^\/browse\/[^/]+/.test(p);
+}
+
+/**
+ * Go somewhere that would leave the question behind.
+ * Returns true when it opened a tab instead of navigating.
+ */
+export function openAway(path) {
+  if (!inQuestion()) { go(path); return false; }
+  window.open(new URL(`#${path}`, location.href).href, '_blank', 'noopener');
+  return true;
+}

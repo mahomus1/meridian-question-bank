@@ -12,7 +12,7 @@
 
 import { h, fill, $ } from '../core/dom.js';
 import * as store from '../core/store.js';
-import { go } from '../core/router.js';
+import { go, openAway } from '../core/router.js';
 import { getTopic, topicMeta, chapter, highlightKey } from '../core/library.js';
 import { getQuestion, meta, cat } from '../core/bank.js';
 import { topicDocument, outline, topicQuestionCount } from '../render/topic.js';
@@ -214,7 +214,13 @@ async function drawTopic(entry) {
         }, '☰'),
         h('button.btn.btn--sm', {
           title: 'Open this topic in the library',
-          onclick: () => { const id = doc.id; closeSheet(); go(`/library/${id}`); },
+          onclick: () => {
+            const id = doc.id;
+            // Over a question, the library gets a tab of its own and the
+            // question keeps the one it is in.
+            if (openAway(`/library/${id}`)) { closeSheet(); toast('Opened in a new tab'); }
+            else { closeSheet(); go(`/library/${id}`); }
+          },
         }, 'Open in library'),
       ],
     }),
@@ -266,7 +272,11 @@ async function drawItem(entry) {
         diffPips(q.diff, { withName: false }),
         h('button.btn.btn--sm', {
           title: 'Open this item on its own page',
-          onclick: () => { const id = entry.id; closeSheet(); go(`/browse/${id}`); },
+          onclick: () => {
+            const id = entry.id;
+            if (openAway(`/browse/${id}`)) { closeSheet(); toast('Opened in a new tab'); }
+            else { closeSheet(); go(`/browse/${id}`); }
+          },
         }, 'Open item'),
       ],
     }),

@@ -90,6 +90,84 @@ export function flush() {
 addEventListener('beforeunload', flush);
 addEventListener('pagehide', flush);
 
+/* ── more than one tab ────────────────────────────────────────────────── */
+
+/* Reading a topic beside a test means two tabs on one store. Each writes the
+   whole document, so without this the last one to save would quietly erase
+   whatever the other had done since it loaded.
+
+   What arrives from the other tab is merged rather than swallowed: additions
+   on both sides are kept, and where the same thing was touched twice the newer
+   copy wins. Deletions do not survive a concurrent edit — resurrecting a note
+   is recoverable, losing an hour of answers is not. */
+function mergeForeign(theirs) {
+  if (!theirs || typeof theirs !== 'object') return;
+
+  for (const [qid, a] of Object.entries(theirs.answers || {})) {
+    const mine = state.answers[qid];
+    if (!mine || (a.at || 0) > (mine.at || 0)) state.answers[qid] = a;
+  }
+
+  const seen = new Set(state.attempts.map((a) => `${a.q}|${a.at}`));
+  for (const a of theirs.attempts || []) {
+    if (!seen.has(`${a.q}|${a.at}`)) state.attempts.push(a);
+  }
+  state.attempts.sort((a, b) => a.at - b.at);
+
+  for (const qid of Object.keys(theirs.marks || {})) state.marks[qid] = true;
+
+  for (const t of theirs.tests || []) {
+    const mine = state.tests.find((x) => x.id === t.id);
+    if (!mine) state.tests.push(t);
+    else if (t.status === 'done' || (t.elapsed || 0) > (mine.elapsed || 0)) {
+      Object.assign(mine, t);
+    }
+  }
+
+  for (const nb of theirs.notebooks || []) {
+    if (!state.notebooks.some((x) => x.id === nb.id)) state.notebooks.push(nb);
+  }
+
+  for (const note of theirs.notes || []) {
+    const mine = state.notes.find((x) => x.id === note.id);
+    if (!mine) state.notes.push(note);
+    else if ((note.updated || 0) > (mine.updated || 0)) Object.assign(mine, note);
+  }
+
+  for (const [key, list] of Object.entries(theirs.highlights || {})) {
+    const mine = state.highlights[key] || [];
+    const ids = new Set(mine.map((x) => x.id));
+    state.highlights[key] = foldList([...mine, ...list.filter((x) => !ids.has(x.id))]);
+  }
+  // Preferences and the capture target are this tab's own view of things.
+}
+
+/* True once we have already answered a foreign write that told us nothing new.
+   Merging is idempotent, so without this the two tabs would take turns writing
+   the same document at each other for ever. */
+let published = false;
+
+addEventListener('storage', (ev) => {
+  if (ev.key !== KEY || !ev.newValue) return;
+  let theirs;
+  try { theirs = JSON.parse(ev.newValue); } catch { return; }
+
+  const before = JSON.stringify(state);
+  mergeForeign(theirs);
+  const gained = JSON.stringify(state) !== before;
+
+  // Write the merge back so the other tab sees it. When they brought nothing
+  // new, one write still goes out — what is on disk is missing what we hold.
+  if (gained) { published = false; flush(); }
+  else if (!published) { published = true; flush(); }
+  if (!gained) return;
+
+  emit('sync');
+  for (const topic of ['answers', 'attempts', 'marks', 'tests', 'notes', 'notebooks', 'highlights']) {
+    emit(topic, null);
+  }
+});
+
 /* ── subscriptions ────────────────────────────────────────────────────── */
 
 const subs = new Map();

@@ -297,6 +297,19 @@ h1, h2, h3, h4 { font-weight: 600; line-height: 1.25; }
 [data-theme="dark"] .rail__link[aria-current="page"] { color: var(--blue-2); }
 .rail__link--quiet { font-size: 13px; color: var(--ink-3); }
 
+/* Mid-question these open a tab of their own. The mark appears only then, so
+   the rail is not permanently decorated with something usually untrue. */
+.rail__link--away::after {
+  content: ""; margin-left: auto; width: 11px; height: 11px; flex: none;
+  opacity: 0; background: currentColor;
+  -webkit-mask: var(--ico-away) center / 11px no-repeat;
+  mask: var(--ico-away) center / 11px no-repeat;
+  --ico-away: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 5H5v14h14v-5'/%3E%3Cpath d='M14 4h6v6'/%3E%3Cpath d='M20 4l-8 8'/%3E%3C/svg%3E");
+  transition: opacity var(--t);
+}
+.rail__link--away:hover::after, .rail__link--away:focus-visible::after { opacity: .55; }
+.rail__link--away .rail__count { margin-left: 0; }
+
 .rail__ico {
   width: 16px; height: 16px; flex: none;
   background: currentColor;
