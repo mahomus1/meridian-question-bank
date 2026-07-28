@@ -31,7 +31,7 @@ export function topicQuestionCount(doc) {
  * @param {object} doc                 full topic body
  * @param {{onQuestion?:Function, showQuestions?:boolean}} opts
  */
-export function topicDocument(doc, { onQuestion, showQuestions = false } = {}) {
+export function topicDocument(doc, { onQuestion, showQuestions = false, showBlurb = true } = {}) {
   const hls = store.highlightsFor(highlightKey(doc.id));
 
   const paras = (sec) => sec.paras.map((text, i) => {
@@ -45,6 +45,9 @@ export function topicDocument(doc, { onQuestion, showQuestions = false } = {}) {
   lead.dataset.hlLabel = 'Summary';
 
   return h('article.topic',
+    // What the entry covers, in a line, under whichever heading names it —
+    // unless the page has put it beside its own title already.
+    showBlurb && doc.blurb ? h('p.topic__blurb', doc.blurb) : null,
     lead,
 
     doc.keyPoints?.length

@@ -26,10 +26,33 @@ const rand = mulberry32(0x4c494252);          // "LIBR"
 const pick = (a) => a[Math.floor(rand() * a.length)];
 const chance = (p) => rand() < p;
 const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
-const lower = (s) => (s ? s[0].toLowerCase() + s.slice(1) : s);
+/* An acronym keeps its case: "CT angiography" mid-sentence is not "cT". */
+const lower = (s) => (s && !/^[A-Z]{2}/.test(s) ? s[0].toLowerCase() + s.slice(1) : s);
 
 const slugify = (s) => s.toLowerCase()
   .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+/** First clause of a field, for lines that have to stay short. */
+const clause = (s) => String(s || '').split(/[,;—]/)[0].trim();
+
+/* The grey line under a topic's name, in a listing or above its text. The
+   name is already there in full, so a blurb that opened by restating it would
+   spend its only line saying nothing. These say what the entry covers. */
+const BLURBS = [
+  (t) => `${cap(clause(t.pres))}, confirmed with ${lower(clause(t.test))}.`,
+  (t) => `${cap(clause(t.pres))}, with ${lower(clause(t.find))}.`,
+  (t) => `${cap(clause(t.find))}, from ${lower(clause(t.mech))}.`,
+  (t) => `${cap(clause(t.pres))}; first step, ${lower(clause(t.rx))}.`,
+];
+
+/* It has one line to work with. Offer the variants in a rotated order so
+   neighbouring entries do not all read the same way, and take the first that
+   fits — falling back to the shortest rather than letting one run on. */
+function blurbFor(topic, i) {
+  const built = BLURBS.map((f, k) => BLURBS[(k + i) % BLURBS.length](topic));
+  return built.find((s) => s.length <= 96)
+    || built.reduce((a, b) => (b.length < a.length ? b : a));
+}
 
 /* ── section plan ─────────────────────────────────────────────────────── */
 
@@ -179,7 +202,7 @@ function stepsTable(topic) {
 
 /* ── one topic ────────────────────────────────────────────────────────── */
 
-function buildTopic(cat, topic, code, siblings) {
+function buildTopic(cat, topic, code, siblings, seq = 0) {
   const other = pick(siblings);
   const sections = [];
 
@@ -260,7 +283,8 @@ function buildTopic(cat, topic, code, siblings) {
     cat: cat.slug,
     title: topic.name,
     topic: topic.name,                 // the question index's topic string
-    summary: `${cap(topic.pres)} with ${topic.find} is the presentation that defines ${lower(topic.name)}. ${cap(topic.test)} confirms it, and ${lower(topic.rx)} is the initial management.`,
+    blurb: blurbFor(topic, seq),
+    summary: `${cap(topic.name)} presents with ${topic.pres}, typically with ${topic.find}. ${cap(topic.test)} confirms it, and ${lower(topic.rx)} is the initial management.`,
     sections: sections.map((s) => ({
       ...s,
       heading: byId[s.id]?.heading || s.heading,
@@ -286,8 +310,8 @@ export function writeLibrary(root, CATEGORIES, CODES, ABBR, BLURB) {
 
   for (const cat of CATEGORIES) {
     const code = (CODES[cat.slug] || cat.slug.slice(0, 3)).toLowerCase();
-    const docs = cat.topics.map((topic) => buildTopic(
-      cat, topic, code, cat.topics.filter((t) => t.name !== topic.name),
+    const docs = cat.topics.map((topic, i) => buildTopic(
+      cat, topic, code, cat.topics.filter((t) => t.name !== topic.name), i,
     ));
 
     // Related reading stays inside the chapter, so a link never strands the
@@ -314,7 +338,7 @@ export function writeLibrary(root, CATEGORIES, CODES, ABBR, BLURB) {
         topic: d.topic,
         cat: d.cat,
         sections: d.sections.length,
-        summary: d.summary,
+        blurb: d.blurb,
       })),
     });
     total += docs.length;

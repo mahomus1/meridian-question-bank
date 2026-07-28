@@ -84,7 +84,7 @@ export function searchTopics(query, limit = 40) {
   const out = [];
   for (const t of library.byId.values()) {
     if (out.length >= limit) break;
-    const hay = `${t.title} ${t.summary}`.toLowerCase();
+    const hay = `${t.title} ${t.blurb}`.toLowerCase();
     if (hay.includes(q)) out.push(t);
   }
   // A title match is what the reader meant; summary matches follow.
