@@ -32,6 +32,7 @@ let lastBlock = null;       // the block the caret was last in, for placement
 
 const MIN_W = 300;
 const MAX_W = 760;
+const SHUT_W = 210;         // drag narrower than this and letting go closes it
 
 /* ── which note is open ───────────────────────────────────────────────── */
 
@@ -987,21 +988,59 @@ const fileName = (s2) => (s2 || 'note').replace(/[^\w\s-]+/g, '').trim()
 
 /* ── resize ───────────────────────────────────────────────────────────── */
 
+/* Dragging the edge rightwards past the point where the note is still worth
+   reading closes the panel, rather than stopping dead at the minimum and
+   leaving the reader to hunt for the ✕. Below the minimum it keeps following
+   the pointer and fades, so it is clear before letting go what will happen.
+   The width it had is kept, so reopening is the size the reader chose. */
 function startResize(ev) {
   ev.preventDefault();
+  const app = $('#app');
   const startX = ev.clientX;
   const startW = store.prefs().panelWidth || 380;
   document.body.classList.add('resizing-panel');
-  const width = (e) => Math.max(MIN_W, Math.min(MAX_W, startW + (startX - e.clientX)));
 
-  const move = (e) => $('#app').style.setProperty('--panel-w', `${width(e)}px`);
-  const up = (e) => {
-    removeEventListener('pointermove', move);
-    document.body.classList.remove('resizing-panel');
-    store.setPref('panelWidth', width(e));
+  const raw = (e) => Math.min(MAX_W, startW + (startX - e.clientX));
+  const shutting = (e) => raw(e) < SHUT_W;
+  let last = ev;
+
+  const move = (e) => {
+    last = e;
+    app.style.setProperty('--panel-w', `${Math.max(120, raw(e))}px`);
+    root?.classList.toggle('panel--shutting', shutting(e));
   };
+
+  const finish = (e, cancelled) => {
+    removeEventListener('pointermove', move);
+    removeEventListener('pointerup', onUp);
+    removeEventListener('keydown', onKeyEsc, true);
+    document.body.classList.remove('resizing-panel');
+    root?.classList.remove('panel--shutting');
+
+    if (cancelled || shutting(e)) app.style.setProperty('--panel-w', `${startW}px`);
+    if (cancelled) return;
+
+    if (shutting(e)) {
+      setOpen(false);
+      toast('Notebook closed', { action: 'Reopen', onAction: () => setOpen(true) });
+      return;
+    }
+    const w = Math.max(MIN_W, Math.min(MAX_W, raw(e)));
+    app.style.setProperty('--panel-w', `${w}px`);
+    store.setPref('panelWidth', w);
+  };
+
+  const onUp = (e) => finish(e, false);
+  const onKeyEsc = (e) => {
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    e.stopPropagation();
+    finish(last, true);
+  };
+
   addEventListener('pointermove', move);
-  addEventListener('pointerup', up, { once: true });
+  addEventListener('pointerup', onUp);
+  addEventListener('keydown', onKeyEsc, true);
 }
 
 export { meta, cat };

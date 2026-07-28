@@ -1050,3 +1050,9 @@ mark.hl--found { animation: hl-found 2.2s var(--ease); }
 .panel--page .panel__inner { max-width: 760px; margin: 0 auto; padding: 30px 24px 80px; }
 .panel--page .note-title { font-size: 30px; }
 .panel--page .doc { font-size: 16.5px; }
+
+/* Dragged past the point of being readable: it fades out under the pointer so
+   the gesture reads as closing rather than as a resize that has stuck. */
+.panel--shutting { opacity: .35; }
+.panel--shutting .panel__grip { background: color-mix(in srgb, var(--blue) 40%, transparent); }
+body.resizing-panel .panel { transition: opacity .12s var(--ease); }
