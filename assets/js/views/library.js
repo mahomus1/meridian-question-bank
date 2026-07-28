@@ -63,7 +63,7 @@ async function contents(query) {
             h('span.dot', { style: { background: chapter(t.cat)?.dot } }),
             h('span.lib-hit__t', t.title),
             h('span.lib-hit__c', chapter(t.cat)?.name || t.cat),
-            h('span.lib-hit__s.truncate', t.summary))))
+            h('span.lib-hit__s.truncate', t.blurb))))
           : empty({ mark: '⌕', title: 'No matching topics', text: 'Try a different search.' }))
 
         : h('div.shelf.shelf--page', library.index.chapters.map((ch) => {
@@ -83,7 +83,7 @@ async function contents(query) {
                 onclick: () => go(`/library/${t.id}`),
               },
                 h('span.lib-topic__t', t.title),
-                h('span.lib-topic__s.truncate', t.summary)))));
+                h('span.lib-topic__s.truncate', t.blurb)))));
         })),
 
       q ? null : h('div', { style: { marginTop: '20px' } }, sampleNotice()));
@@ -128,23 +128,55 @@ async function reader(topicId, query) {
   const el = h('div.lib-wrap', h('div.lib', navHost, docHost, tocHost));
 
   /* Chapter contents on the left: the topic being read sits inside its own
-     chapter, so moving to the next one never means going back first. */
+     chapter, so moving to the next one never means going back first.
+
+     Going up to all chapters browses them here, in the rail. It is a change of
+     what the list shows, not a change of page — the topic being read stays on
+     screen, which is the whole point of having asked for the list. */
+  let browsing = false;
+  let openChapter = doc.cat;
+
   function drawNav() {
+    if (!browsing) {
+      fill(navHost,
+        h('button.lib-nav__back', {
+          onclick: () => { browsing = true; drawNav(); },
+        }, '‹ All chapters'),
+        h('p.lib-nav__ch',
+          h('span.dot', { style: { background: ch?.dot } }),
+          ch?.name || doc.cat),
+        topicList(ch));
+      return;
+    }
+
     fill(navHost,
-      h('a.lib-nav__back', { href: '#/library' }, '‹ All chapters'),
-      h('p.lib-nav__ch',
-        h('span.dot', { style: { background: ch?.dot } }),
-        ch?.name || doc.cat),
-      h('ul', (ch?.topics || []).map((t) => h('li',
-        h('button.lib-nav__t', {
-          'aria-current': String(t.id === topicId),
-          onclick: () => go(`/library/${t.id}`),
-        }, t.title)))));
+      h('button.lib-nav__back', {
+        onclick: () => { browsing = false; drawNav(); },
+      }, `‹ ${ch?.name || 'This chapter'}`),
+      h('p.lib-nav__ch', 'All chapters'),
+      h('ul.lib-nav__chs', library.index.chapters.map((c) => h('li',
+        h('button.lib-nav__chb', {
+          'aria-expanded': String(c.slug === openChapter),
+          onclick: () => { openChapter = openChapter === c.slug ? null : c.slug; drawNav(); },
+        },
+          h('span.shelf__chev'),
+          h('span.dot', { style: { background: c.dot } }),
+          h('span.truncate.grow', c.name),
+          h('span.shelf__count', c.count)),
+        c.slug === openChapter ? topicList(c) : null))));
   }
+
+  const topicList = (c) => h('ul.lib-nav__ts', (c?.topics || []).map((t) => h('li',
+    h('button.lib-nav__t', {
+      'aria-current': String(t.id === topicId),
+      title: t.blurb,
+      onclick: () => go(`/library/${t.id}`),
+    }, t.title))));
 
   function paint() {
     const art = topicDocument(doc, {
       showQuestions: store.prefs().libQuestions === true,
+      showBlurb: false,           // the page shows it beside the title
       // From the library a question opens over the text, not instead of it.
       onQuestion: (qid) => openItem(qid),
     });
@@ -154,7 +186,8 @@ async function reader(topicId, query) {
         h('p.lib-doc__ch',
           h('span.dot', { style: { background: ch?.dot } }),
           ch?.name || doc.cat),
-        h('h1', doc.title)),
+        h('h1', doc.title),
+        doc.blurb ? h('p.topic__blurb', doc.blurb) : null),
       art,
       doc.related?.length
         ? h('div.topic__related',

@@ -1225,6 +1225,11 @@ body.resizing-panel .sheet { transition: opacity .12s var(--ease); }
 /* ══ a library topic, as a document ═══════════════════════════════════ */
 
 .topic { font-family: var(--prose); font-size: 16.5px; line-height: 1.68; color: var(--ink); }
+/* What the entry covers, under the name that already says what it is. */
+.topic__blurb {
+  font-family: var(--ui); font-size: 12.5px; line-height: 1.45;
+  color: var(--ink-3); margin-bottom: 14px;
+}
 .topic__lead {
   font-size: 17.5px; line-height: 1.6; color: var(--ink-2);
   padding-bottom: 16px; margin-bottom: 4px;
@@ -1323,17 +1328,37 @@ body.resizing-panel .sheet { transition: opacity .12s var(--ease); }
   min-height: 0;
 }
 .lib-nav__back {
-  display: block; padding: 4px 8px 10px;
+  display: block; width: 100%; text-align: left;
+  padding: 4px 8px 10px;
   font-size: 12px; color: var(--ink-3);
+  transition: color var(--t);
 }
 .lib-nav__back:hover { color: var(--blue); }
+
+/* Browsing every chapter without leaving the topic on screen. */
+.lib-nav__chs { display: grid; gap: 1px; min-width: 0; }
+.lib-nav__chs > li { min-width: 0; }
+.lib-nav__chb {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0;
+  padding: 7px 8px; border-radius: var(--r); text-align: left;
+  font-size: 12.5px; font-weight: 600; color: var(--ink-2);
+  transition: background var(--t), color var(--t);
+}
+.lib-nav__chb:hover { background: var(--surface-2); color: var(--ink); }
+.lib-nav__chb[aria-expanded="true"] { color: var(--ink); }
+.lib-nav__chb .shelf__chev { width: 12px; height: 12px; }
+.lib-nav__chb[aria-expanded="true"] .shelf__chev { transform: rotate(90deg); }
+.lib-nav__chs .lib-nav__ts { padding: 2px 0 8px 14px; }
+.lib-nav__chs .lib-nav__t { font-size: 12.5px; padding: 5px 9px; }
 .lib-nav__ch {
   display: flex; align-items: center; gap: 7px;
   padding: 0 8px 8px;
   font-size: 11px; font-weight: 700; letter-spacing: .08em;
   text-transform: uppercase; color: var(--ink-3);
 }
-.lib-nav ul { display: grid; gap: 1px; }
+.lib-nav ul { display: grid; gap: 1px; min-width: 0; }
+.lib-nav li { min-width: 0; }
+.lib-nav { overflow-x: hidden; }
 .lib-nav__t {
   display: block; width: 100%; text-align: left;
   padding: 6px 9px; border-radius: var(--r);
@@ -1357,6 +1382,9 @@ body.resizing-panel .sheet { transition: opacity .12s var(--ease); }
 .lib-doc__head h1 {
   font-size: 31px; font-weight: 660; letter-spacing: -.022em; line-height: 1.15;
 }
+/* The viewer names the topic in its heading, so the entry's own blurb sits
+   with that heading rather than repeating itself further down. */
+.lib-doc__head .topic__blurb { margin: 8px 0 0; font-size: 13px; }
 .lib-doc .topic { font-size: 17px; }
 .lib-doc .notice { margin-top: 30px; }
 
