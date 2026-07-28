@@ -117,6 +117,10 @@ export function mountNotePage(host, noteId) {
   setOpen(false);
   page = host;
   draw();
+  // A note with nothing in it was almost certainly just created, so put the
+  // caret where the reader is about to type instead of making them click.
+  const note = activeNote();
+  if (!note.title && !note.html) host.querySelector('.note-title')?.focus();
 }
 
 export function unmountNotePage() {
@@ -133,6 +137,15 @@ export function unmountNotePage() {
   // Leaving should put the panel back the way the reader had it.
   if (panelWasOpen) setOpen(true);
   else if (isOpen()) draw();
+}
+
+/* Switching notes has to move the page, not just repaint it: the note in view
+   is named in the URL, and a redraw alone would leave the two disagreeing the
+   moment the reader reloads or hits back. */
+function showNote(id) {
+  store.setCaptureTarget(id);
+  if (page) go(`/notebook/${id}`);
+  else draw();
 }
 
 function bookChip(book) {
@@ -713,6 +726,7 @@ function onKey(ev) {
 
 function newNote() {
   const note = store.createNote({ title: '' });
+  if (page) { showNote(note.id); return; }   // the page focuses on mount
   store.setCaptureTarget(note.id);
   draw();
   requestAnimationFrame(() => {
@@ -771,13 +785,13 @@ function browseNotes() {
           notes.length
             ? notes.map((n) => h('button.shelf__note', {
               'aria-current': String(n.id === openId),
-              onclick: () => { store.setCaptureTarget(n.id); close(); draw(); },
+              onclick: () => { close(); showNote(n.id); },
             },
               h('span.shelf__dot'),
               h('span.truncate.grow', noteTitle(n)),
               n.id === openId ? h('span.shelf__open', 'open') : null))
             : h('button.shelf__empty', {
-              onclick: () => { const n = store.createNote({ book: book.id, title: '' }); close(); openNote(n.id); },
+              onclick: () => { const n = store.createNote({ book: book.id, title: '' }); close(); showNote(n.id); },
             }, 'Add the first note')));
     }));
   };
@@ -892,8 +906,10 @@ function moreMenu() {
           });
           if (!ok) return;
           store.deleteNote(note.id);
-          store.setCaptureTarget(store.state.notes[0]?.id || null);
-          draw();
+          const next = store.state.notes[0];
+          if (page && !next) go('/notebook');
+          else if (next) showNote(next.id);
+          else draw();
           toast('Note deleted');
         },
       }, 'Delete note'),
