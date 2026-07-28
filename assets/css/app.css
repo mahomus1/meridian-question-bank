@@ -227,7 +227,7 @@ h1, h2, h3, h4 { font-weight: 600; line-height: 1.25; }
    instead of squeezing the question into nothing. */
 @media (max-width: 1040px) {
   .app--panel { grid-template-columns: var(--rail-w) minmax(0, 1fr); }
-  .app--panel .panel {
+  .app--panel aside.panel {
     position: fixed; inset: 0 0 0 auto; z-index: 40;
     width: min(var(--panel-w, 380px), 92vw);
     box-shadow: var(--shadow-3);
@@ -238,7 +238,7 @@ h1, h2, h3, h4 { font-weight: 600; line-height: 1.25; }
 @keyframes panel-in { from { transform: translateX(14px); opacity: .6 } }
 
 @media (max-width: 1000px) {
-  .app--panel .panel { top: 0; }
+  .app--panel aside.panel { top: 0; }
 }
 
 .wrap { max-width: 1180px; padding: 26px 32px 72px; margin: 0 auto; }

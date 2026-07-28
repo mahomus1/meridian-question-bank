@@ -545,7 +545,10 @@
 
 /* ══ the notebook panel ═══════════════════════════════════════════════ */
 
-.panel {
+/* Scoped to the notebook's own surfaces: `.panel` alone is the generic card
+   that views build content from, and giving it a grid placement here once
+   stacked every question panel on the Highlights page into the same cell. */
+aside.panel, .panel--page {
   grid-column: 3; grid-row: 1;
   /* header, toolbar, document, footer — the document takes what is left.
      One row short and the toolbar would take the flexible row and collapse. */
@@ -873,7 +876,7 @@ body.dragging-block { cursor: grabbing; user-select: none; }
 
 @media print {
   body { overflow: visible; background: #fff; }
-  .rail, .topbar, .runner__bar, .runner__foot, .panel, .overlays,
+  .rail, .topbar, .runner__bar, .runner__foot, aside.panel, .overlays,
   .clipable__act, .nb__rail, .nb__list, .nb-toolbar { display: none !important; }
   .app { display: block; height: auto; }
   .view, .runner__main { overflow: visible; height: auto; }
