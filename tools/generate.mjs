@@ -9,6 +9,7 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import CATEGORIES from './content/topics.mjs';
+import { writeLibrary } from './library.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const TARGET_PER_CATEGORY = 100;
@@ -806,6 +807,10 @@ const REFERENCE = {
 };
 writeFileSync(join(ROOT, 'data', 'reference.json'), JSON.stringify(REFERENCE));
 
+/* ── the library ──────────────────────────────────────────────────────── */
+
+const lib = writeLibrary(ROOT, CATEGORIES, CODES, ABBR, BLURB);
+
 /* ── report ───────────────────────────────────────────────────────────── */
 
 const counts = index.items.reduce((m, q) => ((m[q.diff] = (m[q.diff] || 0) + 1), m), {});
@@ -813,3 +818,4 @@ console.log(`Built ${total} items across ${index.categories.length} categories.`
 console.log('Difficulty spread:', BANDS.map((b) => `${b.label} ${counts[b.id] || 0}`).join(' · '));
 console.log('Figures:', index.items.filter((q) => q.hasFigure).length,
   '· Tables:', index.items.filter((q) => q.hasTable).length);
+console.log(`Library: ${lib.total} topics across ${lib.chapters} chapters · ${lib.words.toLocaleString()} words.`);
