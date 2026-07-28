@@ -1,20 +1,22 @@
-/* All notes.
+/* Notes: the shelf, and a single note opened from it.
 
-   The shelf: notebooks you can open and close, each holding its notes. Writing
-   happens in the side panel, so this page exists to show what you have and to
-   get you back into it. */
+   The shelf holds notebooks you can open and close. Choosing a note gives it
+   the whole page — the same editor the side panel uses, drawn full width. */
 
 import { h, fill } from '../core/dom.js';
 import * as store from '../core/store.js';
 import { ago, n, stamp } from '../core/fmt.js';
 import { htmlToText, excerpt } from '../render/prose.js';
 import { prompt } from '../features/overlay.js';
-import { openNote, noteTitle, exportNotes, notebookSettings } from '../features/notepanel.js';
+import { go } from '../core/router.js';
+import { noteTitle, exportNotes, notebookSettings, mountNotePage, unmountNotePage, noteActions } from '../features/notepanel.js';
 import { empty } from './parts.js';
 
 export default async function notebook({ noteId }) {
   store.ensureNotebook();
-  if (noteId && store.noteById(noteId)) openNote(noteId);
+  // A note opens as a page of its own. Showing it in a strip beside an
+  // otherwise empty list is not opening it.
+  if (noteId && store.noteById(noteId)) return notePage(noteId);
 
   let query = '';
 
@@ -73,7 +75,7 @@ export default async function notebook({ noteId }) {
           }, 'New notebook'),
           h('button.btn.btn--sm', { onclick: exportAll }, 'Export'),
           h('button.btn.btn--sm.btn--primary', {
-            onclick: () => { openNote(store.createNote().id); draw(); },
+            onclick: () => go(`/notebook/${store.createNote().id}`),
           }, 'New note'))),
 
       searching && !found
@@ -97,7 +99,7 @@ export default async function notebook({ noteId }) {
               h('div.row', { style: { gap: '2px' } },
                 h('button.shelf__more', {
                   title: 'Add a note here', 'aria-label': `New note in ${book.name}`,
-                  onclick: () => { openNote(store.createNote({ book: book.id }).id); draw(); },
+                  onclick: () => go(`/notebook/${store.createNote({ book: book.id }).id}`),
                 }, '+'),
                 h('button.shelf__more', {
                   title: `${book.name} settings`, 'aria-label': `${book.name} settings`,
@@ -108,13 +110,13 @@ export default async function notebook({ noteId }) {
               notes.length
                 ? notes.map((nt) => h('button.shelf__row', {
                   'aria-current': String(nt.id === openId),
-                  onclick: () => { openNote(nt.id); draw(); },
+                  onclick: () => go(`/notebook/${nt.id}`),
                 },
                   h('span.shelf__row-t.truncate', noteTitle(nt)),
                   h('span.shelf__row-p.truncate', preview(nt)),
                   h('span.shelf__row-d', ago(nt.updated))))
                 : h('button.shelf__empty', {
-                  onclick: () => { openNote(store.createNote({ book: book.id }).id); draw(); },
+                  onclick: () => go(`/notebook/${store.createNote({ book: book.id }).id}`),
                 }, 'Add the first note')));
         }));
   }
@@ -136,5 +138,38 @@ export default async function notebook({ noteId }) {
     subtitle: `${n(store.state.notes.length)} notes in ${n(books)} notebook${books === 1 ? '' : 's'}`,
     el,
     destroy() { offs.forEach((f) => f()); },
+  };
+}
+
+/* ══ one note, full width ══════════════════════════════════════════════ */
+
+function notePage(noteId) {
+  const note = store.noteById(noteId);
+  const el = h('div.panel.panel--page');
+
+  /* Renaming a note should rename the page it is on. The editor writes the
+     title straight to the store, so the heading follows from there rather than
+     being redrawn — a redraw here would rebuild the editable under the caret.
+     The footer already carries "Edited …", so the subtitle stays empty. */
+  const off = store.on('notes', () => {
+    const now = store.noteById(noteId);
+    if (!now) return;
+    const name = noteTitle(now);
+    const head = document.querySelector('.topbar__title h1');
+    if (head && head.textContent !== name) head.textContent = name;
+    document.title = `${name} — Meridian`;
+  });
+
+  return {
+    title: noteTitle(note),
+    actions: [
+      h('a.btn.btn--sm', { href: '#/notebook' }, '← Notes'),
+      ...noteActions(note),
+    ],
+    el,
+    fixed: true,
+    ownsNotebook: true,
+    mounted() { mountNotePage(el, noteId); },
+    destroy() { off(); unmountNotePage(); },
   };
 }

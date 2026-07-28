@@ -887,7 +887,19 @@ body.dragging-block { cursor: grabbing; user-select: none; }
 .hl-row__bar { width: 4px; align-self: stretch; border-radius: 2px; flex: none; min-height: 22px; }
 .hl-row__t {
   font-family: var(--prose); font-size: 15px; line-height: 1.55;
-  padding-top: 1px;
+  padding-top: 1px; text-align: left; cursor: pointer;
+  border-radius: var(--r-sm);
+  transition: color var(--t);
+}
+.hl-row__t:hover { color: var(--blue); }
+.hl-row__t:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+
+/* The mark you asked for, once the item opens. Fades rather than sitting lit,
+   so it points without becoming a permanent second highlight. */
+mark.hl--found { animation: hl-found 2.2s var(--ease); }
+@keyframes hl-found {
+  0%, 62% { box-shadow: 0 0 0 3px var(--blue-tint), 0 0 0 4px var(--blue); }
+  100% { box-shadow: 0 0 0 3px transparent, 0 0 0 4px transparent; }
 }
 .hl-row__act { display: flex; gap: 4px; flex: none; opacity: 0; transition: opacity var(--t); }
 .hl-row:hover .hl-row__act, .hl-row:focus-within .hl-row__act { opacity: 1; }
@@ -1019,3 +1031,22 @@ body.dragging-block { cursor: grabbing; user-select: none; }
 .note-title:focus { outline: none; }
 .note-title::placeholder { color: var(--ink-4); font-weight: 600; }
 
+
+/* ── a note on a page of its own ────────────────────────────────────── */
+
+/* Same editor as the panel, so it keeps the panel's four-row grid; only the
+   things that made it a side panel are undone. */
+.panel--page {
+  grid-column: auto; grid-row: auto;
+  /* Three children here, not four — the head moved to the shell's topbar. One
+     row too many and the toolbar takes the flexible row and collapses. */
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%; border-left: 0;
+  background: var(--surface);
+}
+.panel--page .tb,
+.panel--page .panel__foot { padding-inline: 24px; }
+/* A line length you can actually read, rather than the full width of a screen. */
+.panel--page .panel__inner { max-width: 760px; margin: 0 auto; padding: 30px 24px 80px; }
+.panel--page .note-title { font-size: 30px; }
+.panel--page .doc { font-size: 16.5px; }

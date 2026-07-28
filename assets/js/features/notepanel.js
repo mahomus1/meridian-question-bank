@@ -1,13 +1,15 @@
-/* The notebook, as an editor beside the page.
+/* The notebook editor.
 
-   One panel, open on any view, holding one note. What is open here is also
-   where clippings land, so there is nothing to configure.
+   It shows in two places and is the same editor in both: a panel beside
+   whatever you are reading, and a full page of its own when you open a note
+   from Notes. Only one is ever live, since there is one caret and one undo
+   stack between them.
 
-   The document is plain: a clipped passage is an ordinary paragraph in the same
-   face as everything else, carrying its origin as an attribute. The first line
-   is the title, the way a page of paper works — there is no separate field for
-   it. Formatting appears on selection or from the shortcuts you already know,
-   and markdown shorthand converts as you type. */
+   The document is plain. A passage saved from a question is an ordinary
+   paragraph in the same face as everything else, carrying its origin as an
+   attribute. The note's name is a field above the document, so the first line
+   is just a line. Formatting comes from the toolbar, the shortcuts you already
+   know, or markdown shorthand as you type. */
 
 import { h, fill, $ } from '../core/dom.js';
 import * as store from '../core/store.js';
@@ -90,17 +92,70 @@ export function mount() {
   apply();
   if (isOpen()) draw();
 
-  // Redraw only for changes made elsewhere. Redrawing on the panel's own saves
+  // Redraw only for changes made elsewhere. Redrawing on the editor's own saves
   // would rebuild the editable element under the caret on every keystroke.
-  store.on('notes', () => { if (!writing && isOpen()) draw(); });
-  store.on('capture', () => { if (isOpen()) draw(); });
+  store.on('notes', () => { if (!writing && live()) draw(); });
+  store.on('capture', () => { if (live()) draw(); });
   return root;
 }
 
 /* ── drawing ──────────────────────────────────────────────────────────── */
 
+/* The editor is a singleton — one caret, one undo stack, one set of saved
+   ranges — so it is drawn into whichever surface is showing. The note page
+   takes precedence over the side panel, and opening it closes the panel
+   rather than leaving two editors on the same note. */
+let page = null;
+let panelWasOpen = false;
+const surface = () => page || root;
+const live = () => !!page || isOpen();
+
+export function mountNotePage(host, noteId) {
+  if (noteId && store.noteById(noteId)) store.setCaptureTarget(noteId);
+  // A second copy of the note beside the page would fight it for the caret.
+  panelWasOpen = isOpen();
+  setOpen(false);
+  page = host;
+  draw();
+}
+
+export function unmountNotePage() {
+  page = null;
+  // Cleared before anything redraws, or the next draw inherits handles to the
+  // page's own elements after they have been torn out of the document.
+  detachDrag?.();
+  detachDrag = null;
+  caretMark = null;
+  watcher?.disconnect();
+  watcher = null;
+  lastBlock = null;
+  savedRange = null;
+  // Leaving should put the panel back the way the reader had it.
+  if (panelWasOpen) setOpen(true);
+  else if (isOpen()) draw();
+}
+
+function bookChip(book) {
+  return h('button.panel__book', { title: 'Browse notebooks and notes', onclick: browseNotes },
+    h('span.dot', { style: { background: book?.color || 'var(--ink-4)' } }),
+    h('span.truncate', book?.name || 'General'),
+    h('span.dest__chev', '▾'));
+}
+
+/** The note page's controls, for the shell's topbar. */
+export function noteActions(note) {
+  return [
+    bookChip(store.notebookById(note.book)),
+    h('button.btn.btn--sm', { onclick: newNote }, 'New note'),
+    h('button.btn.btn--sm', { title: 'Note options', 'aria-label': 'Note options', onclick: moreMenu }, '···'),
+  ];
+}
+
 export function draw() {
-  if (!root || !isOpen()) return;
+  const host = surface();
+  if (!host) return;
+  if (host === root && !isOpen()) return;
+  const onPage = host === page;
   const note = activeNote();
   const book = store.notebookById(note.book);
 
@@ -133,14 +188,13 @@ export function draw() {
     },
   });
 
-  fill(root,
-    h('div.panel__grip', { title: 'Drag to resize', onpointerdown: startResize }),
+  fill(host,
+    onPage ? null : h('div.panel__grip', { title: 'Drag to resize', onpointerdown: startResize }),
 
-    h('header.panel__head',
-      h('button.panel__book', { title: 'Browse notebooks and notes', onclick: browseNotes },
-        h('span.dot', { style: { background: book?.color || 'var(--ink-4)' } }),
-        h('span.truncate', book?.name || 'General'),
-        h('span.dest__chev', '▾')),
+    // On a page of its own these controls live in the shell's topbar, so the
+    // note is not sat under three stacked bars.
+    onPage ? null : h('header.panel__head',
+      bookChip(book),
       h('div.push.row', { style: { gap: '2px' } },
         h('button.panel__ico', { title: 'New note', 'aria-label': 'New note', onclick: newNote }, '+'),
         h('button.panel__ico', { title: 'Note options', 'aria-label': 'Note options', onclick: moreMenu }, '···'),
@@ -176,7 +230,7 @@ export function draw() {
   } catch { /* unsupported */ }
 
   detachDrag?.();
-  detachDrag = enableBlockDrag(root.querySelector('.doc-wrap'), docEl, () => {
+  detachDrag = enableBlockDrag(host.querySelector('.doc-wrap'), docEl, () => {
     clearTimeout(saveTimer);
     persist({ html: serialise() });
   });
@@ -559,7 +613,7 @@ let watcher = null;
    the next saved passage will go. A quiet bar marks the block it was in —
    which is exactly the precision the insertion uses. */
 function showCaretMark() {
-  const wrap = root?.querySelector('.doc-wrap');
+  const wrap = surface()?.querySelector('.doc-wrap');
   if (!wrap || !docEl) return;
   if (!lastBlock || lastBlock.parentElement !== docEl) { hideCaretMark(); return; }
 

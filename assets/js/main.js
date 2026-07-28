@@ -44,7 +44,9 @@ function paintTopbar(view) {
       view.subtitle && h('p', view.subtitle)),
     h('div.topbar__actions',
       view.actions || null,
-      h('button.btn.btn--sm', {
+      // A note already filling the page has no use for a second copy of itself
+      // in a strip beside it.
+      view.ownsNotebook ? null : h('button.btn.btn--sm', {
         'data-panel-toggle': '',
         'aria-pressed': String(panel.isOpen()),
         title: 'Notebook  ⌘J',

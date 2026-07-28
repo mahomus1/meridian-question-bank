@@ -15,7 +15,7 @@ import { toast } from '../features/overlay.js';
 import { diffPips, catTag, statusPip, empty } from './parts.js';
 
 export default async function browse(params) {
-  return params.id ? reader(params.id) : listing(params.query || {});
+  return params.id ? reader(params.id, params.query || {}) : listing(params.query || {});
 }
 
 /* ══ listing ═══════════════════════════════════════════════════════════ */
@@ -171,7 +171,7 @@ async function listing(query) {
 
 /* ══ single item reader ════════════════════════════════════════════════ */
 
-async function reader(id) {
+async function reader(id, query = {}) {
   const m = meta(id);
   if (!m) {
     return {
@@ -219,9 +219,16 @@ async function reader(id) {
     }),
   );
 
+  // Arriving from a highlight, the way back is to the highlights — not to the
+  // bank the reader never came from.
+  const cameFromHighlights = query.from === 'highlights';
+  const back = cameFromHighlights
+    ? h('a.btn.btn--sm', { href: '#/highlights' }, '← Highlights')
+    : h('a.btn.btn--sm', { href: '#/browse' }, '← Question bank');
+
   const el = h('div.runner',
     h('div.runner__bar',
-      h('a.btn.btn--sm', { href: '#/browse' }, '← Question bank'),
+      back,
       h('div.push.row', { style: { gap: '8px' } },
         neighbour(-1), neighbour(1))),
     h('div.runner__body', h('div.runner__main', inner)));
@@ -257,6 +264,9 @@ async function reader(id) {
     fixed: true,
     mounted() {
       detach = attachHighlighter(inner, { qid: id });
+      // Opened from a specific highlight: put it on screen and say which one,
+      // or the reader lands at the top of a long vignette and has to hunt.
+      if (query.hl) revealHighlight(inner, query.hl);
     },
     destroy() {
       document.removeEventListener('keydown', onKey);
@@ -264,4 +274,22 @@ async function reader(id) {
       hidePopover();
     },
   };
+}
+
+/* Put a highlight on screen and mark it briefly. Explanations start collapsed
+   on unanswered items, so a highlight living inside one has to be opened
+   before it can be scrolled to. */
+function revealHighlight(root, hlId) {
+  const find = () => root.querySelector(`mark.hl[data-id="${CSS.escape(hlId)}"]`);
+  let mark = find();
+  if (!mark) {
+    root.querySelectorAll('details:not([open])').forEach((d) => { d.open = true; });
+    mark = find();
+  }
+  if (!mark) return;
+  // Done straight away rather than on the next frame: a backgrounded tab never
+  // paints one, and the reader would arrive to an unmarked page.
+  mark.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  mark.classList.add('hl--found');
+  setTimeout(() => mark.classList.remove('hl--found'), 2200);
 }

@@ -99,11 +99,18 @@ export default async function highlights() {
             catTag(g.m.cat),
             h('span.xs.muted.truncate', g.m.topic),
             h('div.panel__act',
-              h('button.btn.btn--sm', { onclick: () => go(`/browse/${g.qid}`) }, 'Open item'))),
+              h('button.btn.btn--sm', {
+                onclick: () => go(`/browse/${g.qid}?from=highlights`),
+              }, 'Open item'))),
           h('div.panel__body.stack-8',
             g.items.map(({ hl, text }) => h('div.hl-row',
               h('span.hl-row__bar', { style: { background: `var(--hl-${hl.c})` } }),
-              h('p.hl-row__t.grow', text),
+              // The passage is the link: it opens the item scrolled to this
+              // exact mark, which is the only reason to keep a list of them.
+              h('button.hl-row__t.grow', {
+                title: 'Open this passage in the item',
+                onclick: () => go(`/browse/${g.qid}?hl=${encodeURIComponent(hl.id)}&from=highlights`),
+              }, text),
               h('div.hl-row__act',
                 h('button.btn.btn--sm', {
                   onclick: () => { clipText({ qid: g.qid, text, source: 'Highlight' }); draw(); },
