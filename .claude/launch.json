@@ -5,10 +5,10 @@
       "name": "meridian",
       "runtimeExecutable": "python3",
       "runtimeArgs": [
-        "tools/serve.py",
-        "4177"
+        "tools/serve.py"
       ],
-      "port": 4177
+      "port": 4177,
+      "autoPort": true
     }
   ]
 }
