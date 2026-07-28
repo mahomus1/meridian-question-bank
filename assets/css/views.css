@@ -1077,10 +1077,30 @@ mark.hl--found { animation: hl-found 2.2s var(--ease); }
 }
 .panel--page .tb,
 .panel--page .panel__foot { padding-inline: 24px; }
-/* A line length you can actually read, rather than the full width of a screen. */
-.panel--page .panel__inner { max-width: 760px; margin: 0 auto; padding: 30px 24px 80px; }
-.panel--page .note-title { font-size: 30px; }
-.panel--page .doc { font-size: 16.5px; }
+/* A line length you can actually read, rather than the full width of a screen.
+   The full page earns its room the way a document does — the footprint of a
+   Letter sheet with the type scaled up to fill it, headings in step — because
+   wider lines would pass a hundred characters and cost more than they give. */
+.panel--page .panel__inner { max-width: 816px; margin: 0 auto; padding: 34px 24px 80px; }
+.panel--page .note-title { font-size: 32px; }
+.panel--page .doc { font-size: 18px; }
+.panel--page .doc h1 { font-size: 22px; }
+.panel--page .doc h2 { font-size: 20px; }
+.panel--page .doc h3 { font-size: 17.5px; }
+
+/* A phone is not a sheet of paper: the page's margins and its larger type are
+   what a wide screen earns, and keeping them here would leave barely thirty
+   characters on a line. */
+@media (max-width: 700px) {
+  .panel--page .tb,
+  .panel--page .panel__foot { padding-inline: 14px; }
+  .panel--page .panel__inner { padding: 20px 16px 72px; }
+  .panel--page .note-title { font-size: 26px; }
+  .panel--page .doc { font-size: 16.5px; }
+  .panel--page .doc h1 { font-size: 20px; }
+  .panel--page .doc h2 { font-size: 18.5px; }
+  .panel--page .doc h3 { font-size: 16px; }
+}
 
 /* Dragged past the point of being readable: it fades out under the pointer so
    the gesture reads as closing rather than as a resize that has stuck. */
